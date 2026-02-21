@@ -38,7 +38,8 @@ npm install
 ## GitHub Pages deployment notes
 - The frontend uses hash-based routing so deep links work on GitHub Pages.
 - Build output uses relative asset paths (`base: './'`) for project pages.
-- Set `VITE_API_BASE_URL` to your deployed backend URL (for example `https://your-backend.example.com/api`) when building for Pages.
+- This repo is configured to use `https://money-magic.onrender.com/api` for Pages builds by default.
+- You can override it with the GitHub Actions repository variable `VITE_API_BASE_URL`.
 - The workflow also supports backend deploys by calling a provider deploy hook URL stored in the `BACKEND_DEPLOY_HOOK_URL` repository secret.
 - Typical backend providers for this pattern: Render/Railway/Fly deploy hook endpoints.
 

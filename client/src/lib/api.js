@@ -1,6 +1,10 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const githubPagesDefaultApi = 'https://money-magic.onrender.com/api'
+const isGithubPages =
+  typeof window !== 'undefined' && window.location.hostname.endsWith('github.io')
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || (isGithubPages ? githubPagesDefaultApi : '/api')
 
 const client = axios.create({
   baseURL: API_BASE_URL,

@@ -62,7 +62,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://money-magic.onrender.com/api' }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -24,6 +24,7 @@ Set `CORS_ORIGINS` as a comma-separated list of allowed origins.
 
 Examples:
 - Local dev: `CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
+- GitHub Pages frontend: `CORS_ORIGINS=https://lb1227.github.io`
 - Allow all (only when needed): `CORS_ORIGINS=*`
 
 ## API Endpoints

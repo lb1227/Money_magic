@@ -7,6 +7,7 @@ import pandas as pd
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+
 from services.categorize_service import categorize_transactions
 from services.coach_service import build_coach_response
 from services.csv_service import CSVParseError, parse_and_normalize_csv
@@ -16,7 +17,10 @@ from store import get_dataset, save_dataset
 
 app = Flask(__name__)
 
-allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+allowed_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,https://lb1227.github.io",
+)
 origins = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
 if "*" in origins:
     origins = "*"
