@@ -51,10 +51,16 @@ def _coerce_transactions(rows: list[dict]) -> pd.DataFrame:
     return tx[required]
 
 
-def _rebuild_dataset(transactions: list[dict], goals: dict | None = None) -> dict:
+def _rebuild_dataset(transactions: list[dict], goals: dict | None = None, explicit_subscriptions: list[dict] | None = None) -> dict:
     tx = _coerce_transactions(transactions)
     categorized = categorize_transactions(tx)
-    subscriptions = detect_subscriptions(categorized)
+
+    # If the client provided explicit subscriptions (from manual entry), trust and use them.
+    if isinstance(explicit_subscriptions, list) and explicit_subscriptions:
+        subscriptions = explicit_subscriptions
+    else:
+        subscriptions = detect_subscriptions(categorized)
+
     summary = build_summary(categorized, subscriptions)
     return {
         "transactions": categorized.to_dict(orient="records"),
@@ -93,7 +99,7 @@ def create_manual_dataset():
         return jsonify({"error": "Body must include a transactions array."}), 400
 
     dataset_id = str(uuid.uuid4())
-    save_dataset(dataset_id, _rebuild_dataset(transactions, payload.get("goals")))
+    save_dataset(dataset_id, _rebuild_dataset(transactions, payload.get("goals"), payload.get("subscriptions")))
     return jsonify({"dataset_id": dataset_id})
 
 

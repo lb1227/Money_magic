@@ -71,13 +71,17 @@ function Dashboard() {
     return Math.min(100, Math.round((spent / budget) * 100))
   }, [goalForm.monthly_budget, summary?.total_spent_this_month])
 
-  const persistTransactions = async (transactions) => {
+  const persistTransactions = async (transactions, subscriptions = []) => {
     if (!transactions.length) return null
     if (!datasetId) {
-      const result = await createManualDataset(transactions, {
-        monthly_budget: Number(goalForm.monthly_budget || 0),
-        savings_goal: Number(goalForm.savings_goal || 0),
-      })
+      const result = await createManualDataset(
+        transactions,
+        {
+          monthly_budget: Number(goalForm.monthly_budget || 0),
+          savings_goal: Number(goalForm.savings_goal || 0),
+        },
+        subscriptions,
+      )
       localStorage.setItem('datasetId', result.dataset_id)
       setDatasetId(result.dataset_id)
       return result.dataset_id
@@ -91,10 +95,14 @@ function Dashboard() {
     } catch (err) {
       // If backend memory reset made the stored dataset id stale, recreate the dataset seamlessly.
       if (err.response?.status === 404) {
-        const result = await createManualDataset(transactions, {
-          monthly_budget: Number(goalForm.monthly_budget || 0),
-          savings_goal: Number(goalForm.savings_goal || 0),
-        })
+        const result = await createManualDataset(
+          transactions,
+          {
+            monthly_budget: Number(goalForm.monthly_budget || 0),
+            savings_goal: Number(goalForm.savings_goal || 0),
+          },
+          subscriptions,
+        )
         localStorage.setItem('datasetId', result.dataset_id)
         setDatasetId(result.dataset_id)
         return result.dataset_id
@@ -139,8 +147,19 @@ function Dashboard() {
       return
     }
 
+    // derive explicit subscriptions from manual rows so user-marked subscriptions persist
+    const explicitSubscriptions = manualRows
+      .filter((r) => r.type === 'subscription' && r.merchant && Number(r.amount) > 0)
+      .map((r) => ({
+        merchant: r.merchant,
+        interval_days: 30,
+        monthly_cost: Math.round(Math.abs(Number(r.amount)) * 100) / 100,
+        next_charge_date: r.date,
+        confidence: 1.0,
+      }))
+
     try {
-      const activeDatasetId = await persistTransactions(cleaned)
+      const activeDatasetId = await persistTransactions(cleaned, explicitSubscriptions)
       setManualRows([{ ...emptyManualRow }])
       setSuccessMessage('Manual entries saved.')
       await loadData(activeDatasetId)
