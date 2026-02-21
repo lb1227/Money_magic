@@ -10,8 +10,8 @@ function SummaryCards({ summary }) {
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {cards.map((card) => (
-        <article key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h3 className="text-sm text-slate-500">{card.label}</h3>
+        <article key={card.label} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+          <h3 className="text-sm text-slate-500 dark:text-slate-300">{card.label}</h3>
           <p className="mt-1 text-lg font-semibold">{card.value}</p>
         </article>
       ))}
