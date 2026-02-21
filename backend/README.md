@@ -65,7 +65,10 @@ The workflow sends a `POST` request to that URL to start deployment.
 Use a Python Web Service with:
 - Root Directory: `backend`
 - Build Command: `pip install -r requirements.txt`
-- Start Command: `gunicorn app:app`
+- Start Command (recommended): `gunicorn app:app`
+
+If your service is currently using Render's default `gunicorn your_application.wsgi`, this repo now includes a compatible WSGI module as a fallback.
+You can still switch to `gunicorn app:app` for clarity.
 
 If you prefer not to use Gunicorn, set Start Command to `python app.py` instead.
 
