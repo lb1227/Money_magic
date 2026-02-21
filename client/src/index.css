@@ -3,14 +3,5 @@
 @tailwind utilities;
 
 body {
-  @apply text-slate-900 dark:text-slate-100;
-  background: radial-gradient(circle at 10% 20%, rgba(129, 140, 248, 0.2), transparent 35%),
-    radial-gradient(circle at 90% 10%, rgba(217, 70, 239, 0.2), transparent 40%),
-    linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
-}
-
-.dark body {
-  background: radial-gradient(circle at 10% 20%, rgba(79, 70, 229, 0.35), transparent 35%),
-    radial-gradient(circle at 90% 10%, rgba(217, 70, 239, 0.35), transparent 40%),
-    linear-gradient(135deg, #020617 0%, #0f172a 100%);
+  @apply bg-slate-50 text-slate-900;
 }
