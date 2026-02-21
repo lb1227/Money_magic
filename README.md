@@ -1,4 +1,4 @@
-# BudgetBuddy
+# MoneyMagic
 
 Monorepo containing a Flask backend and React + Vite frontend for BudgetBuddy.
 
