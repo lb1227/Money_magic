@@ -39,6 +39,8 @@ npm install
 - The frontend uses hash-based routing so deep links work on GitHub Pages.
 - Build output uses relative asset paths (`base: './'`) for project pages.
 - Set `VITE_API_BASE_URL` to your deployed backend URL (for example `https://your-backend.example.com/api`) when building for Pages.
+- The workflow also supports backend deploys by calling a provider deploy hook URL stored in the `BACKEND_DEPLOY_HOOK_URL` repository secret.
+- Typical backend providers for this pattern: Render/Railway/Fly deploy hook endpoints.
 
 ## Frontend routes
 - `/dashboard` unified dashboard for manual entry (primary), optional CSV import, and charts/graphs
