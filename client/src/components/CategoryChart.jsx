@@ -3,7 +3,7 @@ import { formatCurrency } from '../lib/format'
 
 function CategoryChart({ data }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="mb-3 text-lg font-semibold">Category Spend</h2>
       <div className="h-72">
         <ResponsiveContainer width="100%" height="100%">
