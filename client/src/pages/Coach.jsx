@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import CoachChat from '../components/CoachChat'
-import { askCoach } from '../lib/api'
+import { askCoach, askCoachNoDataset } from '../lib/api'
 
 function Coach() {
   const [messages, setMessages] = useState([])
@@ -8,17 +8,11 @@ function Coach() {
 
   const handleAsk = async (question) => {
     const datasetId = localStorage.getItem('datasetId')
-    if (!datasetId) {
-      setMessages((prev) => [
-        ...prev,
-        { question, response: { summary_text: 'Please upload a dataset first.', recommendations: [] } },
-      ])
-      return
-    }
-
     setLoading(true)
     try {
-      const response = await askCoach(datasetId, question)
+      const response = datasetId
+        ? await askCoach(datasetId, question)
+        : await askCoachNoDataset(question)
       setMessages((prev) => [...prev, { question, response }])
     } catch (err) {
       setMessages((prev) => [

@@ -200,6 +200,32 @@ def coach(dataset_id: str):
     return jsonify({"dataset_id": dataset_id, **response})
 
 
+@app.route("/api/coach", methods=["POST"])
+def coach_without_dataset():
+    payload = request.get_json(silent=True) or {}
+    question = payload.get("question")
+    if not isinstance(question, str) or not question.strip():
+        return jsonify({"error": "Body must include non-empty 'question'."}), 400
+
+    context = payload.get("context")
+    synthetic_summary = {
+        "total_spent_this_month": 0,
+        "biggest_category": {"name": "Unknown"},
+        "subscription_monthly_total": 0,
+        "category_totals": [],
+    }
+    if isinstance(context, dict):
+        synthetic_summary["context"] = context
+
+    response = build_coach_response(
+        question=question,
+        summary=synthetic_summary,
+        subscriptions=[],
+    )
+
+    return jsonify(response)
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     app.run(host="0.0.0.0", port=port, debug=True)

@@ -39,6 +39,7 @@ Examples:
 - `GET /api/datasets/<dataset_id>/summary`
 - `GET /api/datasets/<dataset_id>/subscriptions`
 - `POST /api/datasets/<dataset_id>/coach`
+- `POST /api/coach` (coach without dataset; optional `context`)
 
 ## cURL Examples
 ```bash
@@ -58,4 +59,11 @@ curl http://localhost:5000/api/datasets/<dataset_id>/subscriptions
 curl -X POST http://localhost:5000/api/datasets/<dataset_id>/coach \
   -H "Content-Type: application/json" \
   -d '{"question":"How can I save money?"}'
+```
+
+
+```bash
+curl -X POST http://localhost:5000/api/coach \
+  -H "Content-Type: application/json" \
+  -d '{"question":"How should I start budgeting?","context":{"income":4500,"goals":["build emergency fund"]}}'
 ```

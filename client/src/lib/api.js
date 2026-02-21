@@ -48,4 +48,14 @@ export const askCoach = async (datasetId, question) => {
   return response.data
 }
 
+export const askCoachNoDataset = async (question, context = undefined) => {
+  const payload = { question }
+  if (context && typeof context === 'object') {
+    payload.context = context
+  }
+
+  const response = await client.post('/coach', payload)
+  return response.data
+}
+
 export default client
