@@ -16,10 +16,19 @@ from store import get_dataset, save_dataset
 
 app = Flask(__name__)
 
-allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
-origins = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
-if "*" in origins:
-    origins = "*"
+allowed_origins = os.getenv("CORS_ORIGINS")
+if allowed_origins:
+    origins: str | list[str] = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
+    if "*" in origins:
+        origins = "*"
+else:
+    # Defaults that work for local development, GitHub Pages, and the Render frontend URL.
+    origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        r"https://.*\.github\.io",
+        "https://money-magic.onrender.com",
+    ]
 
 CORS(app, resources={r"/api/*": {"origins": origins}})
 

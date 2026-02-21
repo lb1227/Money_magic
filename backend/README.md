@@ -20,11 +20,18 @@ python app.py
 The API runs on `http://localhost:5001` by default. Set `PORT` to override.
 
 ## CORS
-Set `CORS_ORIGINS` as a comma-separated list of allowed origins.
+Set `CORS_ORIGINS` as a comma-separated list of allowed origins. If omitted, the backend allows localhost, GitHub Pages (`*.github.io`), and `https://money-magic.onrender.com`.
 
 Examples:
 - Local dev: `CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
 - Allow all (only when needed): `CORS_ORIGINS=*`
+
+
+## Persistent storage
+Datasets are persisted to JSON on disk (default: `backend/data/datasets.json`) so they survive app restarts.
+
+- Override location with `DATASTORE_PATH=/absolute/path/datasets.json`
+- On Render, attach a persistent disk and point `DATASTORE_PATH` to that mount path if you want data to survive deploys/restarts.
 
 ## API Endpoints
 - `POST /api/datasets/upload` (multipart form-data with `file`)
