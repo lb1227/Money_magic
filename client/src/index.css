@@ -3,5 +3,9 @@
 @tailwind utilities;
 
 body {
-  @apply bg-slate-50 text-slate-900;
+  @apply bg-slate-100 text-slate-900 transition-colors;
+}
+
+body.dark {
+  @apply bg-slate-950 text-slate-100;
 }
