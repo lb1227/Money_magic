@@ -14,7 +14,13 @@ from services.summary_service import build_summary
 from store import get_dataset, save_dataset
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173"]}})
+
+allowed_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+origins = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
+if "*" in origins:
+    origins = "*"
+
+CORS(app, resources={r"/api/*": {"origins": origins}})
 
 
 @app.errorhandler(404)

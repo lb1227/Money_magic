@@ -16,7 +16,15 @@ pip install -r requirements.txt
 python app.py
 ```
 
+
 The API runs on `http://localhost:5000` by default. Set `PORT` to override.
+
+## CORS
+Set `CORS_ORIGINS` as a comma-separated list of allowed origins.
+
+Examples:
+- Local dev: `CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
+- Allow all (only when needed): `CORS_ORIGINS=*`
 
 ## API Endpoints
 - `POST /api/datasets/upload` (multipart form-data with `file`)
