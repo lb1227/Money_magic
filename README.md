@@ -42,6 +42,9 @@ npm install
 - You can override it with the GitHub Actions repository variable `VITE_API_BASE_URL`.
 - The workflow also supports backend deploys by calling a provider deploy hook URL stored in the `BACKEND_DEPLOY_HOOK_URL` repository secret.
 - Typical backend providers for this pattern: Render/Railway/Fly deploy hook endpoints.
+- Backend CORS must allow your frontend origin. Set `CORS_ORIGINS` (comma-separated) on Render if needed.
+- Backend dataset persistence uses `DATASTORE_PATH` (defaults to `backend/data/datasets.json`).
+  On Render, use a persistent disk + set `DATASTORE_PATH` to keep data across deploys/restarts.
 
 ## Frontend routes
 - `/dashboard` unified dashboard for manual entry (primary), optional CSV import, and charts/graphs

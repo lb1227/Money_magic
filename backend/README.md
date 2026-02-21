@@ -20,12 +20,19 @@ python app.py
 The API runs on `http://localhost:5001` by default. Set `PORT` to override.
 
 ## CORS
-Set `CORS_ORIGINS` as a comma-separated list of allowed origins.
+Set `CORS_ORIGINS` as a comma-separated list of allowed origins. If omitted, the backend allows localhost, GitHub Pages (`*.github.io`), and `https://money-magic.onrender.com`.
 
 Examples:
 - Local dev: `CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
 - GitHub Pages frontend: `CORS_ORIGINS=https://lb1227.github.io`
 - Allow all (only when needed): `CORS_ORIGINS=*`
+
+
+## Persistent storage
+Datasets are persisted to JSON on disk (default: `backend/data/datasets.json`) so they survive app restarts.
+
+- Override location with `DATASTORE_PATH=/absolute/path/datasets.json`
+- On Render, attach a persistent disk and point `DATASTORE_PATH` to that mount path if you want data to survive deploys/restarts.
 
 ## API Endpoints
 - `POST /api/datasets/upload` (multipart form-data with `file`)
@@ -61,3 +68,15 @@ The repo workflow can trigger backend deployments through a deploy hook URL.
 3. Push changes to `backend/**` on `main` (or run the workflow manually).
 
 The workflow sends a `POST` request to that URL to start deployment.
+
+## Render deployment (recommended)
+Use a Python Web Service with:
+- Root Directory: `backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command (recommended): `gunicorn app:app`
+
+If your service is currently using Render's default `gunicorn your_application.wsgi`, this repo now includes a compatible WSGI module as a fallback.
+You can still switch to `gunicorn app:app` for clarity.
+
+If you prefer not to use Gunicorn, set Start Command to `python app.py` instead.
+
