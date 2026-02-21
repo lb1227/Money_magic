@@ -1,6 +1,6 @@
 # MoneyMagic
 
-Monorepo containing a Flask backend and React + Vite frontend for BudgetBuddy.
+Monorepo containing a Flask backend and React + Vite frontend for MoneyMagic.
 
 ## Project structure
 - `backend/` Flask API (CSV upload, summaries, subscriptions, coach)

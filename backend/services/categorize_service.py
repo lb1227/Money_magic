@@ -19,6 +19,10 @@ def categorize_transactions(df: pd.DataFrame) -> pd.DataFrame:
     categorized = df.copy()
 
     def categorize_row(row: pd.Series) -> str:
+        existing_category = str(row.get("category", "")).strip()
+        if existing_category and existing_category.lower() != "nan":
+            return existing_category
+
         haystack = f"{row['merchant']} {row['description']}".lower()
         for category, keywords in CATEGORY_RULES.items():
             if any(keyword in haystack for keyword in keywords):

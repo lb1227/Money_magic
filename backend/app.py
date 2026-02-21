@@ -37,17 +37,24 @@ def health():
 def _coerce_transactions(rows: list[dict]) -> pd.DataFrame:
     tx = pd.DataFrame(rows or [])
     if tx.empty:
-        return pd.DataFrame(columns=["date", "description", "merchant", "amount"])
+        return pd.DataFrame(columns=["tx_id", "date", "description", "merchant", "amount", "category", "source"])
 
-    required = ["date", "description", "merchant", "amount"]
+    required = ["tx_id", "date", "description", "merchant", "amount", "category", "source"]
     for col in required:
         if col not in tx.columns:
-            tx[col] = "" if col != "amount" else 0.0
+            if col == "amount":
+                tx[col] = 0.0
+            else:
+                tx[col] = ""
 
     tx["amount"] = pd.to_numeric(tx["amount"], errors="coerce").fillna(0.0)
+    tx["tx_id"] = tx["tx_id"].astype(str)
+    tx.loc[tx["tx_id"].str.strip() == "", "tx_id"] = [str(uuid.uuid4()) for _ in range((tx["tx_id"].str.strip() == "").sum())]
     tx["date"] = tx["date"].astype(str)
     tx["description"] = tx["description"].astype(str)
     tx["merchant"] = tx["merchant"].astype(str)
+    tx["category"] = tx["category"].astype(str)
+    tx["source"] = tx["source"].astype(str)
     return tx[required]
 
 
@@ -79,7 +86,7 @@ def upload_dataset():
         return jsonify({"error": str(exc)}), 400
 
     dataset_id = str(uuid.uuid4())
-    payload = _rebuild_dataset(normalized.to_dict(orient="records"))
+    payload = _rebuild_dataset(normalized.assign(source="csv").to_dict(orient="records"))
     save_dataset(dataset_id, payload)
 
     return jsonify({"dataset_id": dataset_id})
@@ -108,9 +115,68 @@ def add_transaction(dataset_id: str):
     if any(field not in payload for field in required):
         return jsonify({"error": "Body must include date, description, merchant, and amount."}), 400
 
+    payload["tx_id"] = payload.get("tx_id") or str(uuid.uuid4())
+    payload["source"] = payload.get("source") or "manual"
     transactions = [*dataset.get("transactions", []), payload]
     save_dataset(dataset_id, _rebuild_dataset(transactions, dataset.get("goals", {})))
     return jsonify({"dataset_id": dataset_id, "transaction_count": len(transactions)})
+
+
+@app.route("/api/datasets/<dataset_id>/transactions", methods=["GET"])
+def list_transactions(dataset_id: str):
+    dataset = get_dataset(dataset_id)
+    if dataset is None:
+        return jsonify({"error": "Dataset not found."}), 404
+
+    return jsonify({"dataset_id": dataset_id, "transactions": dataset.get("transactions", [])})
+
+
+@app.route("/api/datasets/<dataset_id>/transactions/<tx_id>", methods=["PUT"])
+def update_transaction(dataset_id: str, tx_id: str):
+    dataset = get_dataset(dataset_id)
+    if dataset is None:
+        return jsonify({"error": "Dataset not found."}), 404
+
+    payload = request.get_json(silent=True) or {}
+    required = ["date", "description", "merchant", "amount"]
+    if any(field not in payload for field in required):
+        return jsonify({"error": "Body must include date, description, merchant, and amount."}), 400
+
+    updated = False
+    transactions = []
+    for transaction in dataset.get("transactions", []):
+        if transaction.get("tx_id") == tx_id:
+            updated = True
+            transactions.append(
+                {
+                    **transaction,
+                    **payload,
+                    "tx_id": tx_id,
+                }
+            )
+        else:
+            transactions.append(transaction)
+
+    if not updated:
+        return jsonify({"error": "Transaction not found."}), 404
+
+    save_dataset(dataset_id, _rebuild_dataset(transactions, dataset.get("goals", {})))
+    return jsonify({"dataset_id": dataset_id, "tx_id": tx_id})
+
+
+@app.route("/api/datasets/<dataset_id>/transactions/<tx_id>", methods=["DELETE"])
+def delete_transaction(dataset_id: str, tx_id: str):
+    dataset = get_dataset(dataset_id)
+    if dataset is None:
+        return jsonify({"error": "Dataset not found."}), 404
+
+    previous = dataset.get("transactions", [])
+    transactions = [transaction for transaction in previous if transaction.get("tx_id") != tx_id]
+    if len(transactions) == len(previous):
+        return jsonify({"error": "Transaction not found."}), 404
+
+    save_dataset(dataset_id, _rebuild_dataset(transactions, dataset.get("goals", {})))
+    return jsonify({"dataset_id": dataset_id, "tx_id": tx_id})
 
 
 @app.route("/api/datasets/<dataset_id>/goals", methods=["PUT"])

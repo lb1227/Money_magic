@@ -1,4 +1,4 @@
-"""In-memory dataset store for BudgetBuddy MVP."""
+"""In-memory dataset store for MoneyMagic MVP."""
 
 from typing import Any
 

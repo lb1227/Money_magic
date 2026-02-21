@@ -1,4 +1,4 @@
-# BudgetBuddy Backend (Flask)
+# MoneyMagic Backend (Flask)
 
 ## Requirements
 - Python 3.11+

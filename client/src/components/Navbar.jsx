@@ -10,7 +10,7 @@ function Navbar({ darkMode, onToggleTheme }) {
   return (
     <nav className="mb-6 rounded-2xl border border-indigo-200/40 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 p-[1px] shadow-glow" aria-label="Main navigation">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/95 px-4 py-3 dark:bg-slate-900/95">
-        <h1 className="text-lg font-semibold tracking-tight text-indigo-700 dark:text-indigo-300">✨ BudgetBuddy Magic</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-indigo-700 dark:text-indigo-300">✨ MoneyMagic</h1>
         <div className="flex flex-wrap items-center gap-2">
           {links.map((link) => (
             <NavLink

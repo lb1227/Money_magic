@@ -13,7 +13,7 @@ function CoachChat({ onAsk, loading, messages }) {
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-3 text-lg font-semibold">Ask BudgetBuddy Coach</h2>
+      <h2 className="mb-3 text-lg font-semibold">Ask MoneyMagic Coach</h2>
       <form onSubmit={handleSubmit} className="mb-4 flex gap-2">
         <input
           type="text"

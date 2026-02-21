@@ -53,6 +53,21 @@ export const addTransaction = async (datasetId, transaction) => {
   }
 }
 
+export const fetchTransactions = async (datasetId) => {
+  const response = await client.get(`/datasets/${datasetId}/transactions`)
+  return response.data
+}
+
+export const updateTransaction = async (datasetId, txId, transaction) => {
+  const response = await client.put(`/datasets/${datasetId}/transactions/${txId}`, transaction)
+  return response.data
+}
+
+export const deleteTransaction = async (datasetId, txId) => {
+  const response = await client.delete(`/datasets/${datasetId}/transactions/${txId}`)
+  return response.data
+}
+
 export const updateGoals = async (datasetId, goals) => {
   const response = await client.put(`/datasets/${datasetId}/goals`, goals)
   return response.data
