@@ -51,3 +51,12 @@ curl -X POST http://localhost:5001/api/datasets/<dataset_id>/coach \
   -H "Content-Type: application/json" \
   -d '{"question":"How can I save money?"}'
 ```
+
+## Deployment from GitHub Actions (optional)
+The repo workflow can trigger backend deployments through a deploy hook URL.
+
+1. Create a deploy hook on your backend host (Render, Railway, Fly, etc.).
+2. Add it as a GitHub repository secret named `BACKEND_DEPLOY_HOOK_URL`.
+3. Push changes to `backend/**` on `main` (or run the workflow manually).
+
+The workflow sends a `POST` request to that URL to start deployment.

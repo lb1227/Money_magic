@@ -29,13 +29,15 @@ export const uploadDataset = async (file) => {
   return response.data
 }
 
-export const createManualDataset = async (transactions = [], goals = {}) => {
+export const createManualDataset = async (transactions = [], goals = {}, subscriptions = []) => {
+  const payload = { transactions, goals }
+  if (Array.isArray(subscriptions) && subscriptions.length) payload.subscriptions = subscriptions
   try {
-    const response = await client.post('/datasets/manual', { transactions, goals })
+    const response = await client.post('/datasets/manual', payload)
     return response.data
   } catch (error) {
     if (shouldTryLocalFallback(error)) {
-      return fallbackRequest('post', '/datasets/manual', { transactions, goals })
+      return fallbackRequest('post', '/datasets/manual', payload)
     }
     throw error
   }
