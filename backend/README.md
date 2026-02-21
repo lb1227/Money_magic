@@ -60,3 +60,12 @@ The repo workflow can trigger backend deployments through a deploy hook URL.
 3. Push changes to `backend/**` on `main` (or run the workflow manually).
 
 The workflow sends a `POST` request to that URL to start deployment.
+
+## Render deployment (recommended)
+Use a Python Web Service with:
+- Root Directory: `backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `gunicorn app:app`
+
+If you prefer not to use Gunicorn, set Start Command to `python app.py` instead.
+
