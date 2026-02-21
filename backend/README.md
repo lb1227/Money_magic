@@ -16,8 +16,16 @@ pip install -r requirements.txt
 python app.py
 ```
 
-
 The API runs on `http://localhost:5000` by default. Set `PORT` to override.
+
+## Gemini Coach (optional, recommended)
+Set `GEMINI_API_KEY` to make `/coach` use Gemini as the primary reasoning engine.
+
+```bash
+export GEMINI_API_KEY="your_api_key_here"
+```
+
+If `GEMINI_API_KEY` is missing or Gemini returns an error, the backend automatically falls back to the built-in rule-based coach.
 
 ## CORS
 Set `CORS_ORIGINS` as a comma-separated list of allowed origins.

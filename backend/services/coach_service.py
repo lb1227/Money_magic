@@ -1,9 +1,15 @@
-"""Rule-based coaching recommendations."""
+"""Coaching recommendations with Gemini-first strategy and rule-based fallback."""
 
 from __future__ import annotations
 
+import json
+import os
 
-def build_coach_response(question: str, summary: dict, subscriptions: list[dict]) -> dict:
+
+GEMINI_MODEL = "gemini-2.5-flash"
+
+
+def _build_rule_based_response(question: str, summary: dict, subscriptions: list[dict]) -> dict:
     question_lower = (question or "").lower()
     recommendations: list[dict] = []
 
@@ -61,3 +67,100 @@ def build_coach_response(question: str, summary: dict, subscriptions: list[dict]
         "summary_text": summary_text,
         "recommendations": recommendations,
     }
+
+
+def _build_gemini_prompt(question: str, summary: dict, subscriptions: list[dict]) -> str:
+    return (
+        "You are BudgetBuddy Coach, a practical personal finance assistant. "
+        "Given the user's question and account data, provide concise, actionable guidance.\n\n"
+        "Return ONLY valid JSON, with this exact schema:\n"
+        "{\n"
+        '  "summary_text": "string",\n'
+        '  "recommendations": [\n'
+        "    {\n"
+        '      "title": "string",\n'
+        '      "savings_impact": number,\n'
+        '      "steps": ["string", "string"]\n'
+        "    }\n"
+        "  ]\n"
+        "}\n\n"
+        "Constraints:\n"
+        "- recommendations should have 1-3 items.\n"
+        "- savings_impact should be a monthly dollar estimate.\n"
+        "- Do not include markdown or explanatory text outside JSON.\n\n"
+        f"User question:\n{question}\n\n"
+        f"Summary JSON:\n{json.dumps(summary, ensure_ascii=False)}\n\n"
+        f"Subscriptions JSON:\n{json.dumps(subscriptions, ensure_ascii=False)}\n"
+    )
+
+
+def _coerce_coach_shape(payload: dict) -> dict:
+    summary_text = payload.get("summary_text")
+    recommendations = payload.get("recommendations")
+
+    if not isinstance(summary_text, str) or not summary_text.strip():
+        raise ValueError("Gemini payload missing valid summary_text")
+    if not isinstance(recommendations, list):
+        raise ValueError("Gemini payload missing valid recommendations list")
+
+    cleaned_recommendations: list[dict] = []
+    for item in recommendations[:3]:
+        if not isinstance(item, dict):
+            continue
+
+        title = item.get("title")
+        steps = item.get("steps")
+        if not isinstance(title, str) or not title.strip() or not isinstance(steps, list):
+            continue
+
+        cleaned_steps = [step for step in steps if isinstance(step, str) and step.strip()][:4]
+        if not cleaned_steps:
+            continue
+
+        savings_impact = item.get("savings_impact", 0)
+        try:
+            savings_impact = float(savings_impact)
+        except (TypeError, ValueError):
+            savings_impact = 0.0
+
+        cleaned_recommendations.append(
+            {
+                "title": title.strip(),
+                "savings_impact": round(savings_impact, 2),
+                "steps": cleaned_steps,
+            }
+        )
+
+    if not cleaned_recommendations:
+        raise ValueError("Gemini payload produced no valid recommendations")
+
+    return {
+        "summary_text": summary_text.strip(),
+        "recommendations": cleaned_recommendations,
+    }
+
+
+def _build_gemini_response(question: str, summary: dict, subscriptions: list[dict]) -> dict:
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not configured")
+
+    from google import genai
+
+    client = genai.Client(api_key=api_key)
+    prompt = _build_gemini_prompt(question=question, summary=summary, subscriptions=subscriptions)
+    response = client.models.generate_content(model=GEMINI_MODEL, contents=prompt)
+
+    text = (response.text or "").strip()
+    if not text:
+        raise ValueError("Empty Gemini response")
+
+    payload = json.loads(text)
+    return _coerce_coach_shape(payload)
+
+
+def build_coach_response(question: str, summary: dict, subscriptions: list[dict]) -> dict:
+    try:
+        return _build_gemini_response(question=question, summary=summary, subscriptions=subscriptions)
+    except Exception:
+        return _build_rule_based_response(question=question, summary=summary, subscriptions=subscriptions)
