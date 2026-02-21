@@ -9,6 +9,8 @@ def build_summary(df: pd.DataFrame, subscriptions: list[dict]) -> dict:
     tx = df.copy()
     tx["parsed_date"] = pd.to_datetime(tx["date"])
     tx["month"] = tx["parsed_date"].dt.strftime("%Y-%m")
+    tx["expense_amount"] = tx["amount"].clip(lower=0)
+    tx["income_amount"] = (-tx["amount"]).clip(lower=0)
 
     spending = tx[tx["amount"] > 0]
 
@@ -42,14 +44,43 @@ def build_summary(df: pd.DataFrame, subscriptions: list[dict]) -> dict:
             for month, amount in monthly_series.items()
         ]
 
+    if tx.empty:
+        monthly_cashflow = []
+        total_income_this_month = 0.0
+        net_cashflow_this_month = 0.0
+    else:
+        latest_month_all = tx["month"].max()
+        month_slice = tx[tx["month"] == latest_month_all]
+        total_income_this_month = round(float(month_slice["income_amount"].sum()), 2)
+        net_cashflow_this_month = round(float(total_income_this_month - month_slice["expense_amount"].sum()), 2)
+
+        cashflow_series = (
+            tx.groupby("month")[["expense_amount", "income_amount"]]
+            .sum()
+            .sort_index()
+            .reset_index()
+        )
+        monthly_cashflow = [
+            {
+                "month": row["month"],
+                "expenses": round(float(row["expense_amount"]), 2),
+                "income": round(float(row["income_amount"]), 2),
+                "net": round(float(row["income_amount"] - row["expense_amount"]), 2),
+            }
+            for _, row in cashflow_series.iterrows()
+        ]
+
     subscription_monthly_total = round(
         float(sum(item["monthly_cost"] for item in subscriptions)), 2
     )
 
     return {
         "total_spent_this_month": total_spent_this_month,
+        "total_income_this_month": total_income_this_month,
+        "net_cashflow_this_month": net_cashflow_this_month,
         "subscription_monthly_total": subscription_monthly_total,
         "biggest_category": biggest_category,
         "category_totals": category_totals,
         "monthly_totals": monthly_totals,
+        "monthly_cashflow": monthly_cashflow,
     }

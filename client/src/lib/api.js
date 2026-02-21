@@ -6,6 +6,22 @@ const client = axios.create({
   baseURL: API_BASE_URL,
 })
 
+const shouldTryLocalFallback = (error) => {
+  if (API_BASE_URL !== '/api') return false
+  if (typeof window === 'undefined') return false
+  if (!(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) return false
+  return error?.response?.status === 404
+}
+
+const fallbackRequest = async (method, path, payload) => {
+  const response = await axios({
+    method,
+    url: `http://localhost:5001/api${path}`,
+    data: payload,
+  })
+  return response.data
+}
+
 export const uploadDataset = async (file) => {
   const formData = new FormData()
   formData.append('file', file)
@@ -14,13 +30,27 @@ export const uploadDataset = async (file) => {
 }
 
 export const createManualDataset = async (transactions = [], goals = {}) => {
-  const response = await client.post('/datasets/manual', { transactions, goals })
-  return response.data
+  try {
+    const response = await client.post('/datasets/manual', { transactions, goals })
+    return response.data
+  } catch (error) {
+    if (shouldTryLocalFallback(error)) {
+      return fallbackRequest('post', '/datasets/manual', { transactions, goals })
+    }
+    throw error
+  }
 }
 
 export const addTransaction = async (datasetId, transaction) => {
-  const response = await client.post(`/datasets/${datasetId}/transactions`, transaction)
-  return response.data
+  try {
+    const response = await client.post(`/datasets/${datasetId}/transactions`, transaction)
+    return response.data
+  } catch (error) {
+    if (shouldTryLocalFallback(error)) {
+      return fallbackRequest('post', `/datasets/${datasetId}/transactions`, transaction)
+    }
+    throw error
+  }
 }
 
 export const updateGoals = async (datasetId, goals) => {

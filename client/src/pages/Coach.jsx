@@ -11,7 +11,7 @@ function Coach() {
     if (!datasetId) {
       setMessages((prev) => [
         ...prev,
-        { question, response: { summary_text: 'Please upload a dataset first.', recommendations: [] } },
+        { question, response: { summary_text: 'Please add manual data in Dashboard first.', recommendations: [] } },
       ])
       return
     }

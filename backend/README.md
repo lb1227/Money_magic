@@ -17,7 +17,7 @@ python app.py
 ```
 
 
-The API runs on `http://localhost:5000` by default. Set `PORT` to override.
+The API runs on `http://localhost:5001` by default. Set `PORT` to override.
 
 ## CORS
 Set `CORS_ORIGINS` as a comma-separated list of allowed origins.
@@ -34,20 +34,20 @@ Examples:
 
 ## cURL Examples
 ```bash
-curl -X POST http://localhost:5000/api/datasets/upload \
+curl -X POST http://localhost:5001/api/datasets/upload \
   -F "file=@sample.csv"
 ```
 
 ```bash
-curl http://localhost:5000/api/datasets/<dataset_id>/summary
+curl http://localhost:5001/api/datasets/<dataset_id>/summary
 ```
 
 ```bash
-curl http://localhost:5000/api/datasets/<dataset_id>/subscriptions
+curl http://localhost:5001/api/datasets/<dataset_id>/subscriptions
 ```
 
 ```bash
-curl -X POST http://localhost:5000/api/datasets/<dataset_id>/coach \
+curl -X POST http://localhost:5001/api/datasets/<dataset_id>/coach \
   -H "Content-Type: application/json" \
   -d '{"question":"How can I save money?"}'
 ```

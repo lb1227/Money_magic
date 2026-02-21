@@ -11,8 +11,8 @@ function UploadCard({ onUpload, loading, successMessage, error }) {
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-2 text-xl font-semibold">Import from CSV (optional)</h2>
-      <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">You can upload statements or add data manually below.</p>
+      <h2 className="mb-2 text-xl font-semibold">CSV import (optional)</h2>
+      <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">Manual entry is the primary method. Use CSV only when needed.</p>
 
       <div
         className={`rounded-xl border-2 border-dashed p-10 text-center transition ${

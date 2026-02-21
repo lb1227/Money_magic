@@ -10,7 +10,7 @@ function Subscriptions() {
   useEffect(() => {
     const datasetId = localStorage.getItem('datasetId')
     if (!datasetId) {
-      setError('No dataset uploaded yet. Please upload a CSV first.')
+      setError('No dataset found. Add manual entries in the Dashboard first.')
       return
     }
 

@@ -24,7 +24,7 @@ npm run dev
 ```
 
 The frontend reads `VITE_API_BASE_URL` from `.env` and defaults to `/api`.
-In local development, Vite proxies `/api` requests to `http://localhost:5000`.
+In local development, Vite proxies `/api` requests to `http://localhost:5001`.
 
 ## GitHub Pages deployment notes
 - The frontend uses hash-based routing so deep links work on GitHub Pages.
@@ -32,7 +32,6 @@ In local development, Vite proxies `/api` requests to `http://localhost:5000`.
 - Set `VITE_API_BASE_URL` to your deployed backend URL (for example `https://your-backend.example.com/api`) when building for Pages.
 
 ## Frontend routes
-- `/upload` CSV upload flow
-- `/dashboard` summary cards + category chart
+- `/dashboard` unified dashboard for manual entry (primary), optional CSV import, and charts/graphs
 - `/subscriptions` detected subscriptions table with UI-only cancel flags
 - `/coach` rule-based coaching chat UI
