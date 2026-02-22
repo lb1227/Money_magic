@@ -1,15 +1,16 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
-import AuthModal, { SESSION_KEY } from './components/AuthModal'
+import AuthModal from './components/AuthModal'
 import Coach from './pages/Coach'
 import Dashboard from './pages/Dashboard'
 import Subscriptions from './pages/Subscriptions'
+import { supabase } from './lib/supabase'
 
 function App() {
   const [darkMode, setDarkMode] = useState(localStorage.getItem('theme') === 'dark')
   const [showAuthModal, setShowAuthModal] = useState(false)
-  const [sessionEmail, setSessionEmail] = useState(localStorage.getItem(SESSION_KEY) || '')
+  const [sessionEmail, setSessionEmail] = useState('')
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
@@ -17,8 +18,32 @@ function App() {
     localStorage.setItem('theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
-  const handleLogout = () => {
-    localStorage.removeItem(SESSION_KEY)
+  useEffect(() => {
+    const syncSession = async () => {
+      const { data, error } = await supabase.auth.getSession()
+      if (error) {
+        setSessionEmail('')
+        return
+      }
+
+      setSessionEmail(data?.session?.user?.email || '')
+    }
+
+    syncSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSessionEmail(session?.user?.email || '')
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
     setSessionEmail('')
   }
 
