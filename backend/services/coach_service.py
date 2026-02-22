@@ -76,6 +76,45 @@ def _call_gemini(question: str, api_key: str) -> Optional[str]:
         return None
 
 
+def _build_gemini_prompt(question: str, summary: dict, subscriptions: list[dict]) -> str:
+    """Build a grounded prompt so answers stay within MoneyMagic data/topics."""
+    category_totals = summary.get("category_totals", [])[:5]
+    category_lines = [
+        f"- {item.get('category', 'Unknown')}: ${item.get('amount', 0):,.2f}"
+        for item in category_totals
+    ]
+    subscription_lines = [
+        f"- {item.get('merchant', 'Unknown')}: ${item.get('monthly_cost', 0):,.2f}/month"
+        for item in (subscriptions or [])[:10]
+    ]
+
+    categories_text = "\n".join(category_lines) if category_lines else "- No category data available"
+    subscriptions_text = "\n".join(subscription_lines) if subscription_lines else "- No subscriptions detected"
+
+    return f"""
+You are MoneyMagic Coach inside a personal finance app.
+
+Hard rules:
+1) Use ONLY the dataset facts provided below.
+2) Stay ONLY on MoneyMagic topics: spending, budgeting, subscriptions, recurring charges, and savings actions.
+3) Never claim you cannot access data when the data is provided here.
+4) If requested data is not present, clearly say that the dataset does not currently include it.
+5) Keep response concise (2-5 sentences) and practical.
+
+Dataset facts:
+- Total spent this month: ${summary.get('total_spent_this_month', 0):,.2f}
+- Biggest category: {summary.get('biggest_category', {}).get('name', 'N/A')}
+- Subscription monthly total: ${summary.get('subscription_monthly_total', 0):,.2f}
+- Top categories:
+{categories_text}
+- Known subscriptions:
+{subscriptions_text}
+
+User question:
+{question}
+""".strip()
+
+
 def build_coach_response(question: str, summary: dict, subscriptions: list[dict], gemini_api_key: Optional[str] = None) -> dict:
     """Return a small coaching response.
 
@@ -87,7 +126,8 @@ def build_coach_response(question: str, summary: dict, subscriptions: list[dict]
 
     # Use provided key if present, else load
     gemini_key = gemini_api_key or load_gemini_key()
-    gemini_text = _call_gemini(question, gemini_key) if gemini_key else None
+    gemini_prompt = _build_gemini_prompt(question, summary, subscriptions)
+    gemini_text = _call_gemini(gemini_prompt, gemini_key) if gemini_key else None
 
     logger.info(
         "Coach Gemini status: key_present=%s sdk_loaded=%s using_fallback=%s",
@@ -150,4 +190,3 @@ def build_coach_response(question: str, summary: dict, subscriptions: list[dict]
         "summary_text": gemini_text or summary_text,
         "recommendations": recommendations,
     }
-
