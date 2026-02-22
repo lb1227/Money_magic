@@ -6,26 +6,6 @@ Monorepo containing a Flask backend and React + Vite frontend for MoneyMagic.
 - `backend/` Flask API (CSV upload, summaries, subscriptions, coach)
 - `client/` React UI with TailwindCSS, React Router, Recharts
 
-## Backend quick start
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python app.py
-```
-
-## Client quick start
-```bash
-cd client
-npm install
-cp .env.example .env
-npm run dev
-```
-
-The frontend reads `VITE_API_BASE_URL` from `.env` and defaults to `/api`.
-In local development, Vite proxies `/api` requests to `http://localhost:5001`.
-
 
 ## Refresh dependencies from `main`
 ```bash
