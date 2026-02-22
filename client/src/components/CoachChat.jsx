@@ -13,7 +13,13 @@ function CoachChat({ onAsk, loading, messages }) {
 
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <h2 className="mb-3 text-lg font-semibold">Ask MoneyMagic Coach</h2>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Ask MoneyMagic Coach</h2>
+        <span className="inline-flex items-center rounded-full border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 px-3 py-1 text-xs font-semibold text-violet-700 shadow-sm dark:border-violet-800 dark:from-violet-950/50 dark:to-indigo-950/50 dark:text-violet-200">
+          Powered by Gemini Pro
+        </span>
+      </div>
+
       <form onSubmit={handleSubmit} className="mb-4 flex gap-2">
         <input
           type="text"
@@ -34,13 +40,16 @@ function CoachChat({ onAsk, loading, messages }) {
       {loading && <p className="text-sm text-indigo-700">Thinking...</p>}
 
       <div className="space-y-4">
-        {messages.map((msg, index) => (
-          <div key={index} className="space-y-2 rounded-lg border border-slate-200 p-3">
-            <p><span className="font-medium">You:</span> {msg.question}</p>
-            <p><span className="font-medium">Coach:</span> {msg.response.summary_text}</p>
-            <RecommendationCards recommendations={msg.response.recommendations || []} />
-          </div>
-        ))}
+        {messages.map((msg, index) => {
+          const hasRecommendations = Array.isArray(msg.response.recommendations) && msg.response.recommendations.length > 0
+          return (
+            <div key={index} className="space-y-2 rounded-lg border border-slate-200 p-3">
+              <p><span className="font-medium">You:</span> {msg.question}</p>
+              <p><span className="font-medium">Coach:</span> {msg.response.summary_text}</p>
+              {hasRecommendations && <RecommendationCards recommendations={msg.response.recommendations} />}
+            </div>
+          )
+        })}
       </div>
     </section>
   )
