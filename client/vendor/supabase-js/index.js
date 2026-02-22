@@ -62,10 +62,12 @@ export const createClient = (supabaseUrl, supabaseAnonKey) => {
         headers: {
           'Content-Type': 'application/json',
           apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify(payload),
       })
-      const json = await response.json()
+      const text = await response.text()
+      const json = text ? parseJson(text, {}) : {}
 
       if (!response.ok) {
         return {
@@ -98,7 +100,7 @@ export const createClient = (supabaseUrl, supabaseAnonKey) => {
   return {
     auth: {
       signUp: ({ email, password }) => request('signup', { email, password }),
-      signInWithPassword: ({ email, password }) => request('token?grant_type=password', { email, password }),
+      signInWithPassword: ({ email, password }) => request('token?grant_type=password', { email, password, grant_type: 'password' }),
       getSession: async () => ({ data: { session: getStoredSession() }, error: null }),
       onAuthStateChange: (callback) => {
         listeners.add(callback)

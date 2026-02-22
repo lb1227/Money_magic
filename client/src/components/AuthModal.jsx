@@ -24,6 +24,18 @@ const getAuthErrorMessage = (message = '', mode) => {
     return 'Too many attempts. Please wait a moment and try again.'
   }
 
+  if (normalized.includes('missing supabase configuration')) {
+    return 'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your client .env.'
+  }
+
+  if (normalized.includes('unable to reach authentication service') || normalized.includes('failed to fetch')) {
+    return 'Could not reach Supabase. Please verify your URL/key and network, then try again.'
+  }
+
+  if (normalized.includes('invalid email')) {
+    return 'Please enter a valid email address.'
+  }
+
   if (mode === 'login') {
     return 'Unable to log in right now. Please try again.'
   }
