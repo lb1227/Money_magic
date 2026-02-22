@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import UploadCard from '../components/UploadCard'
 import { createManualDataset, uploadDataset } from '../lib/api'
+import { saveDatasetId } from '../lib/datasetStore'
 
 const emptyTx = { date: '', merchant: '', description: '', amount: '' }
 
@@ -19,7 +20,7 @@ function Upload() {
     setSuccessMessage('')
     try {
       const result = await uploadDataset(file)
-      localStorage.setItem('datasetId', result.dataset_id)
+      await saveDatasetId(result.dataset_id)
       setSuccessMessage('Upload successful')
       setTimeout(() => navigate('/dashboard'), 600)
     } catch (err) {
@@ -51,7 +52,7 @@ function Upload() {
         monthly_budget: Number(goals.monthly_budget || 0),
         savings_goal: Number(goals.savings_goal || 0),
       })
-      localStorage.setItem('datasetId', result.dataset_id)
+      await saveDatasetId(result.dataset_id)
       setSuccessMessage('Manual dataset created ✨')
       setTimeout(() => navigate('/dashboard'), 600)
     } catch (err) {

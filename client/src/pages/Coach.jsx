@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import CoachChat from '../components/CoachChat'
 import { askCoach } from '../lib/api'
+import { getDatasetId } from '../lib/datasetStore'
 
 function Coach() {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)
 
   const handleAsk = async (question) => {
-    const datasetId = localStorage.getItem('datasetId')
+    const datasetId = await getDatasetId()
     if (!datasetId) {
       setMessages((prev) => [
         ...prev,
