@@ -6,7 +6,7 @@ const links = [
   { to: '/coach', label: 'Coach' },
 ]
 
-function Navbar({ darkMode, onToggleTheme }) {
+function Navbar({ darkMode, onToggleTheme, isAuthenticated, onOpenAuthModal, onLogout }) {
   return (
     <nav className="mb-6 rounded-2xl border border-indigo-200/40 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 p-[1px] shadow-glow" aria-label="Main navigation">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white/95 px-4 py-3 dark:bg-slate-900/95">
@@ -34,6 +34,23 @@ function Navbar({ darkMode, onToggleTheme }) {
           >
             {darkMode ? 'Light' : 'Dark'}
           </button>
+          {isAuthenticated ? (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white"
+            >
+              Log out
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenAuthModal}
+              className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white"
+            >
+              Log in
+            </button>
+          )}
         </div>
       </div>
     </nav>
