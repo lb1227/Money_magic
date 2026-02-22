@@ -480,10 +480,16 @@ function Dashboard() {
     setSuccessMessage('')
 
     const cleaned = manualRows
-      .filter((row) => row.date && row.merchant && row.category && Number(row.amount) > 0)
+      .filter(
+        (row) =>
+          row.date
+          && row.category
+          && Number(row.amount) > 0
+          && (row.flow === 'income' || row.merchant)
+      )
       .map((row) => ({
         date: row.date,
-        merchant: row.merchant,
+        merchant: row.flow === 'income' ? (row.merchant || 'Income') : row.merchant,
         description: row.description || `${row.category} ${row.flow}`,
         category: row.category,
         source: 'manual',
@@ -491,7 +497,7 @@ function Dashboard() {
       }))
 
     if (!cleaned.length) {
-      setError('Add at least one valid manual entry with date, merchant, category, and amount.')
+      setError('Add at least one valid manual entry with date, category, and amount (merchant is only required for expenses).')
       setSaving(false)
       return
     }
@@ -545,7 +551,7 @@ function Dashboard() {
       setError('')
       await updateTransaction(datasetId, editingTxId, {
         date: editRow.date,
-        merchant: editRow.merchant,
+        merchant: editRow.flow === 'income' ? (editRow.merchant || 'Income') : editRow.merchant,
         description: editRow.description || `${editRow.category} ${editRow.flow}`,
         category: editRow.category,
         source: 'manual',
@@ -667,20 +673,22 @@ function Dashboard() {
                   />
                 </label>
 
-                <label className="space-y-1 text-sm">
-                  <span className="text-slate-600 dark:text-slate-300">Merchant</span>
-                  <input
-                    placeholder="Merchant"
-                    className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                    value={row.merchant}
-                    onChange={(e) => updateManualRow(index, { merchant: e.target.value })}
-                  />
-                </label>
+                {row.flow === 'expense' && (
+                  <label className="space-y-1 text-sm">
+                    <span className="text-slate-600 dark:text-slate-300">Merchant</span>
+                    <input
+                      placeholder="Merchant"
+                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      value={row.merchant}
+                      onChange={(e) => updateManualRow(index, { merchant: e.target.value })}
+                    />
+                  </label>
+                )}
 
                 <label className="space-y-1 text-sm">
-                  <span className="text-slate-600 dark:text-slate-300">Description</span>
+                  <span className="text-slate-600 dark:text-slate-300">Description (optional)</span>
                   <input
-                    placeholder="Description"
+                    placeholder="Description (optional)"
                     className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
                     value={row.description}
                     onChange={(e) => updateManualRow(index, { description: e.target.value })}
@@ -924,7 +932,13 @@ function Dashboard() {
                       {isEditing ? <input type="date" className="rounded border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-800" value={editRow.date} onChange={(e) => setEditRow((prev) => ({ ...prev, date: e.target.value }))} /> : tx.date}
                     </td>
                     <td className="px-3 py-2">
-                      {isEditing ? <input className="rounded border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-800" value={editRow.merchant} onChange={(e) => setEditRow((prev) => ({ ...prev, merchant: e.target.value }))} /> : tx.merchant}
+                      {isEditing ? (
+                        editRow.flow === 'expense' ? (
+                          <input className="rounded border border-slate-300 bg-white p-1 dark:border-slate-700 dark:bg-slate-800" value={editRow.merchant} onChange={(e) => setEditRow((prev) => ({ ...prev, merchant: e.target.value }))} />
+                        ) : (
+                          <span className="text-slate-500">—</span>
+                        )
+                      ) : tx.merchant}
                     </td>
                     <td className="px-3 py-2">
                       {isEditing ? (

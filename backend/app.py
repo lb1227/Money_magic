@@ -95,11 +95,34 @@ def _rebuild_dataset(transactions: list[dict], goals: dict | None = None, explic
     tx = _coerce_transactions(transactions)
     categorized = categorize_transactions(tx)
 
+    manual_subscriptions = []
+    for transaction in categorized.to_dict(orient="records"):
+        is_manual_subscription = (
+            transaction.get("source") == "manual_subscription"
+            or str(transaction.get("category", "")).lower() == "subscription"
+        )
+        amount = float(transaction.get("amount", 0) or 0)
+        merchant = str(transaction.get("merchant", "") or "").strip()
+        if not is_manual_subscription or amount <= 0 or not merchant:
+            continue
+
+        interval_days = max(1, int(float(transaction.get("interval_days", 30) or 30)))
+        monthly_cost = round(amount * (30 / interval_days), 2)
+        manual_subscriptions.append(
+            {
+                "merchant": merchant,
+                "interval_days": interval_days,
+                "monthly_cost": monthly_cost,
+                "next_charge_date": transaction.get("next_charge_date") or transaction.get("date", ""),
+                "confidence": None,
+            }
+        )
+
     # If the client provided explicit subscriptions (from manual entry), trust and use them.
     if isinstance(explicit_subscriptions, list) and explicit_subscriptions:
-        subscriptions = explicit_subscriptions
+        subscriptions = [*explicit_subscriptions, *manual_subscriptions]
     else:
-        subscriptions = detect_subscriptions(categorized)
+        subscriptions = [*detect_subscriptions(categorized), *manual_subscriptions]
 
     summary = build_summary(categorized, subscriptions)
     return {
