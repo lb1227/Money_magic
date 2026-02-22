@@ -9,7 +9,6 @@ import {
   fetchTransactions,
   updateTransaction,
 } from '../lib/api'
-import { getDatasetId, saveDatasetId } from '../lib/datasetStore'
 
 const FREQUENCY_OPTIONS = [
   { value: 'weekly', label: 'Weekly', days: 7 },
@@ -132,26 +131,22 @@ function Subscriptions() {
   }, [])
 
   useEffect(() => {
-    const init = async () => {
-      const datasetId = await getDatasetId()
-      if (!datasetId) {
-        setError('No dataset found. Add manual entries in the Dashboard first.')
-        return
-      }
-
-      loadData(datasetId).catch((err) =>
-        setError(err.response?.data?.error || 'Failed to load subscriptions')
-      )
+    const datasetId = localStorage.getItem('datasetId')
+    if (!datasetId) {
+      setError('No dataset found. Add manual entries in the Dashboard first.')
+      return
     }
 
-    init()
+    loadData(datasetId).catch((err) =>
+      setError(err.response?.data?.error || 'Failed to load subscriptions')
+    )
   }, [loadData])
 
   const persistManualSubscriptions = async (transactions) => {
-    const datasetId = await getDatasetId()
+    const datasetId = localStorage.getItem('datasetId')
     if (!datasetId) {
       const result = await createManualDataset(transactions)
-      await saveDatasetId(result.dataset_id)
+      localStorage.setItem('datasetId', result.dataset_id)
       return result.dataset_id
     }
 
@@ -211,7 +206,7 @@ function Subscriptions() {
   }
 
   const saveEdit = async () => {
-    const datasetId = await getDatasetId()
+    const datasetId = localStorage.getItem('datasetId')
     if (!datasetId || !editingTxId) return
 
     try {
@@ -238,7 +233,7 @@ function Subscriptions() {
   }
 
   const removeManualSubscription = async (tx) => {
-    const datasetId = await getDatasetId()
+    const datasetId = localStorage.getItem('datasetId')
     if (!datasetId) return
 
     try {
@@ -259,7 +254,7 @@ function Subscriptions() {
   }
 
   const saveOneTimeFuturePayment = async () => {
-    const datasetId = await getDatasetId()
+    const datasetId = localStorage.getItem('datasetId')
     const todayIso = toIsoDate(new Date())
     const amount = Number(oneTimePayment.amount || 0)
     if (!oneTimePayment.date || oneTimePayment.date < todayIso || !oneTimePayment.merchant || amount <= 0) {
@@ -281,7 +276,7 @@ function Subscriptions() {
       setError('')
       if (!datasetId) {
         const result = await createManualDataset([payload])
-        await saveDatasetId(result.dataset_id)
+        localStorage.setItem('datasetId', result.dataset_id)
         await loadData(result.dataset_id)
       } else {
         await addTransaction(datasetId, payload)
