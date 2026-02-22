@@ -459,6 +459,21 @@ function Dashboard() {
     }
   }
 
+  const updateManualRow = (index, patch) => {
+    setManualRows((prev) =>
+      prev.map((entry, idx) => {
+        if (idx !== index) return entry
+        const next = { ...entry, ...patch }
+        if (next.flow === 'income') {
+          next.category = 'Income'
+        } else if (next.category === 'Income') {
+          next.category = 'Other'
+        }
+        return next
+      })
+    )
+  }
+
   const saveManualEntries = async () => {
     setSaving(true)
     setError('')
@@ -607,63 +622,95 @@ function Dashboard() {
           </div>
 
           {manualRows.map((row, index) => (
-            <div key={`${row.date}-${index}`} className="grid gap-2 md:grid-cols-6">
-              <select
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                value={row.flow}
-                onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, flow: e.target.value } : entry)))}
-              >
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-              </select>
-              <select
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                value={row.category}
-                onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, category: e.target.value } : entry)))}
-              >
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="date"
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                value={row.date}
-                onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, date: e.target.value } : entry)))}
-              />
-              <input
-                placeholder="Merchant"
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                value={row.merchant}
-                onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, merchant: e.target.value } : entry)))}
-              />
-              <input
-                placeholder="Description"
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                value={row.description}
-                onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, description: e.target.value } : entry)))}
-              />
-              <div className="flex gap-2">
-                <input
-                  placeholder="Amount"
-                  type="number"
-                  min="0"
-                  className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-                  value={row.amount}
-                  onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, amount: e.target.value } : entry)))}
-                />
-                {manualRows.length > 1 && (
+            <div key={`${row.date}-${index}`} className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <label className="space-y-1 text-sm">
+                  <span className="text-slate-600 dark:text-slate-300">Type</span>
+                  <select
+                    className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    value={row.flow}
+                    onChange={(e) => updateManualRow(index, { flow: e.target.value })}
+                  >
+                    <option value="expense">Expense</option>
+                    <option value="income">Income</option>
+                  </select>
+                </label>
+
+                {row.flow === 'expense' ? (
+                  <label className="space-y-1 text-sm">
+                    <span className="text-slate-600 dark:text-slate-300">Category</span>
+                    <select
+                      className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                      value={row.category}
+                      onChange={(e) => updateManualRow(index, { category: e.target.value })}
+                    >
+                      {categories.filter((category) => category !== 'Income').map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-300">
+                    Income entries are automatically categorized as Income.
+                  </div>
+                )}
+
+                <label className="space-y-1 text-sm">
+                  <span className="text-slate-600 dark:text-slate-300">Date</span>
+                  <input
+                    type="date"
+                    className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    value={row.date}
+                    onChange={(e) => updateManualRow(index, { date: e.target.value })}
+                  />
+                </label>
+
+                <label className="space-y-1 text-sm">
+                  <span className="text-slate-600 dark:text-slate-300">Merchant</span>
+                  <input
+                    placeholder="Merchant"
+                    className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    value={row.merchant}
+                    onChange={(e) => updateManualRow(index, { merchant: e.target.value })}
+                  />
+                </label>
+
+                <label className="space-y-1 text-sm">
+                  <span className="text-slate-600 dark:text-slate-300">Description</span>
+                  <input
+                    placeholder="Description"
+                    className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    value={row.description}
+                    onChange={(e) => updateManualRow(index, { description: e.target.value })}
+                  />
+                </label>
+
+                <label className="space-y-1 text-sm">
+                  <span className="text-slate-600 dark:text-slate-300">Amount</span>
+                  <input
+                    placeholder="Amount"
+                    type="number"
+                    min="0"
+                    className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                    value={row.amount}
+                    onChange={(e) => updateManualRow(index, { amount: e.target.value })}
+                  />
+                </label>
+              </div>
+
+              {manualRows.length > 1 && (
+                <div className="flex justify-end">
                   <button
                     type="button"
-                    className="rounded-lg border border-slate-300 px-3 text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                    className="rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300"
                     onClick={() => setManualRows((prev) => prev.filter((_, idx) => idx !== index))}
                   >
-                    Remove
+                    Remove row
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ))}
 
