@@ -26,6 +26,7 @@ import {
   updateTransaction,
   uploadDataset,
 } from '../lib/api'
+import { getDatasetId, saveDatasetId } from '../lib/datasetStore'
 
 const colors = ['#6366f1', '#a855f7', '#ec4899', '#22c55e', '#f59e0b']
 const categories = ['Food', 'Groceries', 'Rent', 'Utilities', 'Transport', 'Entertainment', 'Shopping', 'Income', 'Other']
@@ -121,7 +122,7 @@ function CollapsibleSection({ title, isOpen, onToggle, children, className = '' 
 }
 
 function Dashboard() {
-  const [datasetId, setDatasetId] = useState(localStorage.getItem('datasetId'))
+  const [datasetId, setDatasetId] = useState('')
   const [summary, setSummary] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [now, setNow] = useState(new Date())
@@ -149,6 +150,15 @@ function Dashboard() {
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60000)
     return () => window.clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const hydrateDataset = async () => {
+      const id = await getDatasetId()
+      setDatasetId(id)
+    }
+
+    hydrateDataset()
   }, [])
 
   const loadData = useCallback(async (id = datasetId) => {
@@ -418,7 +428,7 @@ function Dashboard() {
         monthly_budget: Number(goalForm.monthly_budget || 0),
         savings_goal: Number(goalForm.savings_goal || 0),
       })
-      localStorage.setItem('datasetId', result.dataset_id)
+      await saveDatasetId(result.dataset_id)
       setDatasetId(result.dataset_id)
       return result.dataset_id
     }
@@ -434,7 +444,7 @@ function Dashboard() {
           monthly_budget: Number(goalForm.monthly_budget || 0),
           savings_goal: Number(goalForm.savings_goal || 0),
         })
-        localStorage.setItem('datasetId', result.dataset_id)
+        await saveDatasetId(result.dataset_id)
         setDatasetId(result.dataset_id)
         return result.dataset_id
       }
@@ -448,7 +458,7 @@ function Dashboard() {
     setSuccessMessage('')
     try {
       const result = await uploadDataset(file)
-      localStorage.setItem('datasetId', result.dataset_id)
+      await saveDatasetId(result.dataset_id)
       setDatasetId(result.dataset_id)
       setSuccessMessage('CSV imported successfully.')
       await loadData(result.dataset_id)
