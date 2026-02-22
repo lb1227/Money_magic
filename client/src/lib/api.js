@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { setActiveDatasetId } from './userProfileStore'
 
 const githubPagesDefaultApi = 'https://money-magic.onrender.com/api'
 const isGithubPages =
@@ -30,6 +31,7 @@ export const uploadDataset = async (file) => {
   const formData = new FormData()
   formData.append('file', file)
   const response = await client.post('/datasets/upload', formData)
+  await setActiveDatasetId(response.data?.dataset_id).catch(() => null)
   return response.data
 }
 
@@ -38,6 +40,7 @@ export const createManualDataset = async (transactions = [], goals = {}, subscri
   if (Array.isArray(subscriptions) && subscriptions.length) payload.subscriptions = subscriptions
   try {
     const response = await client.post('/datasets/manual', payload)
+    await setActiveDatasetId(response.data?.dataset_id).catch(() => null)
     return response.data
   } catch (error) {
     if (shouldTryLocalFallback(error)) {

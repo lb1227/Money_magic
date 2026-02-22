@@ -30,3 +30,45 @@ npm install
 - `/dashboard` unified dashboard for manual entry (primary), optional CSV import, and charts/graphs
 - `/subscriptions` detected subscriptions table with UI-only cancel flags
 - `/coach` rule-based coaching chat UI
+
+## Supabase auth + per-user dataset persistence
+The frontend now supports Supabase email/password auth and stores the signed-in user's active dataset id in Supabase.
+
+### Required frontend env vars
+Set these in your deployment secrets/variables:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+### Required Supabase table
+Create this table in Supabase SQL editor:
+
+```sql
+create table if not exists public.user_profiles (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  active_dataset_id text,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_profiles enable row level security;
+
+create policy "user_profiles_select_own"
+on public.user_profiles
+for select
+using (auth.uid() = user_id);
+
+create policy "user_profiles_insert_own"
+on public.user_profiles
+for insert
+with check (auth.uid() = user_id);
+
+create policy "user_profiles_update_own"
+on public.user_profiles
+for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+```
+
+### Supabase Auth settings
+- Enable Email provider (Auth > Providers).
+- Decide whether email confirmation is required.
+  - If required, users will see a message to confirm email after sign-up.
