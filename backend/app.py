@@ -251,9 +251,15 @@ def get_summary(dataset_id: str):
 def get_subscriptions(dataset_id: str):
     dataset = get_dataset(dataset_id)
     if dataset is None:
-        return jsonify({"error": "Dataset not found."}), 404
+        return jsonify({
+            "error": "Dataset not found.",
+            "hint": "Create a manual dataset first via POST /api/datasets/manual, or use POST /api/datasets/manual-subscriptions to create one with subscriptions."
+        }), 404
 
-    return jsonify({"dataset_id": dataset_id, "subscriptions": dataset["subscriptions"]})
+    return jsonify({
+        "dataset_id": dataset_id,
+        "subscriptions": dataset.get("subscriptions", []),
+    })
 
 
 @app.route("/api/datasets/<dataset_id>/coach", methods=["POST"])
