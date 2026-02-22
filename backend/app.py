@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import uuid
+from datetime import date, datetime, timedelta
+from urllib.parse import quote_plus
 
 import pandas as pd
 from flask import Flask, jsonify, request
@@ -41,13 +43,37 @@ def health():
 def _coerce_transactions(rows: list[dict]) -> pd.DataFrame:
     tx = pd.DataFrame(rows or [])
     if tx.empty:
-        return pd.DataFrame(columns=["tx_id", "date", "description", "merchant", "amount", "category", "source"])
+        return pd.DataFrame(
+            columns=[
+                "tx_id",
+                "date",
+                "description",
+                "merchant",
+                "amount",
+                "category",
+                "source",
+                "interval_days",
+                "next_charge_date",
+            ]
+        )
 
-    required = ["tx_id", "date", "description", "merchant", "amount", "category", "source"]
+    required = [
+        "tx_id",
+        "date",
+        "description",
+        "merchant",
+        "amount",
+        "category",
+        "source",
+        "interval_days",
+        "next_charge_date",
+    ]
     for col in required:
         if col not in tx.columns:
             if col == "amount":
                 tx[col] = 0.0
+            elif col == "interval_days":
+                tx[col] = 0
             else:
                 tx[col] = ""
 
@@ -59,6 +85,8 @@ def _coerce_transactions(rows: list[dict]) -> pd.DataFrame:
     tx["merchant"] = tx["merchant"].astype(str)
     tx["category"] = tx["category"].astype(str)
     tx["source"] = tx["source"].astype(str)
+    tx["interval_days"] = pd.to_numeric(tx["interval_days"], errors="coerce").fillna(0).astype(int)
+    tx["next_charge_date"] = tx["next_charge_date"].astype(str)
     return tx[required]
 
 
@@ -216,24 +244,125 @@ def get_calendar_events(dataset_id: str):
     if dataset is None:
         return jsonify({"error": "Dataset not found."}), 404
 
-    events = []
+    def _next_due(last_charge: date, interval_days: int) -> date:
+        today = date.today()
+        safe_interval = max(1, interval_days)
+        due = last_charge
+        while due < today:
+            due = due + timedelta(days=safe_interval)
+        return due
+
+    events_map: dict[tuple[str, str], dict] = {}
+
+    # 1) Use detected subscriptions.
     for subscription in dataset.get("subscriptions", []):
-        text = f"Pay {subscription['merchant']} subscription"
-        details = f"Estimated monthly cost ${subscription['monthly_cost']}"
-        date = subscription["next_charge_date"].replace("-", "")
+        merchant = subscription.get("merchant", "Subscription")
+        due_iso = str(subscription.get("next_charge_date", ""))
+        if not due_iso:
+            continue
+        text = f"Pay {merchant} subscription"
+        details = f"Estimated monthly cost ${subscription.get('monthly_cost', 0)}"
+        dates = due_iso.replace("-", "")
         url = (
             "https://calendar.google.com/calendar/render?action=TEMPLATE"
-            f"&text={text.replace(' ', '+')}"
-            f"&dates={date}/{date}"
-            f"&details={details.replace(' ', '+')}"
+            f"&text={quote_plus(text)}"
+            f"&dates={dates}/{dates}"
+            f"&details={quote_plus(details)}"
         )
-        events.append(
-            {
+        key = (merchant, due_iso)
+        events_map[key] = {
+            "title": text,
+            "date": due_iso,
+            "google_calendar_url": url,
+        }
+
+    # 2) Include manual subscription entries as recurring due dates.
+    manual_transactions = [
+        tx
+        for tx in dataset.get("transactions", [])
+        if (
+            tx.get("source") == "manual_subscription"
+            or str(tx.get("category", "")).lower() == "subscription"
+        )
+        and float(tx.get("amount", 0) or 0) > 0
+        and tx.get("merchant")
+        and tx.get("date")
+    ]
+
+    latest_by_merchant: dict[str, dict] = {}
+    for tx in manual_transactions:
+        merchant = str(tx.get("merchant"))
+        current = latest_by_merchant.get(merchant)
+        if current is None or str(tx.get("date", "")) > str(current.get("date", "")):
+            latest_by_merchant[merchant] = tx
+
+    for merchant, tx in latest_by_merchant.items():
+        try:
+            last_charge = datetime.strptime(str(tx["date"]), "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        interval_days = int(float(tx.get("interval_days", 30) or 30))
+        raw_next_charge = str(tx.get("next_charge_date", "") or "").strip()
+        if raw_next_charge:
+            try:
+                base_due = datetime.strptime(raw_next_charge, "%Y-%m-%d").date()
+            except ValueError:
+                base_due = last_charge
+        else:
+            base_due = last_charge
+
+        due_date = _next_due(base_due, interval_days)
+        due_iso = due_date.isoformat()
+        text = f"Pay {merchant} subscription"
+        details = f"Estimated monthly cost ${round(float(tx.get('amount', 0) or 0), 2)}"
+        dates = due_iso.replace("-", "")
+        url = (
+            "https://calendar.google.com/calendar/render?action=TEMPLATE"
+            f"&text={quote_plus(text)}"
+            f"&dates={dates}/{dates}"
+            f"&details={quote_plus(details)}"
+        )
+        key = (merchant, due_iso)
+        if key not in events_map:
+            events_map[key] = {
                 "title": text,
-                "date": subscription["next_charge_date"],
+                "date": due_iso,
                 "google_calendar_url": url,
             }
+
+    # 3) Include one-time future payments created from the calendar UI.
+    for tx in dataset.get("transactions", []):
+        if tx.get("source") != "one_time_future_payment":
+            continue
+        tx_date = str(tx.get("date", "")).strip()
+        merchant = str(tx.get("merchant", "Planned payment")).strip() or "Planned payment"
+        description = str(tx.get("description", "")).strip()
+        if not tx_date:
+            continue
+        try:
+            parsed = datetime.strptime(tx_date, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        if parsed < date.today():
+            continue
+
+        title = description or f"One-time payment: {merchant}"
+        details = f"Planned amount ${round(float(tx.get('amount', 0) or 0), 2)}"
+        dates = tx_date.replace("-", "")
+        url = (
+            "https://calendar.google.com/calendar/render?action=TEMPLATE"
+            f"&text={quote_plus(title)}"
+            f"&dates={dates}/{dates}"
+            f"&details={quote_plus(details)}"
         )
+        key = (title, tx_date)
+        events_map[key] = {
+            "title": title,
+            "date": tx_date,
+            "google_calendar_url": url,
+        }
+
+    events = sorted(events_map.values(), key=lambda item: item["date"])
 
     return jsonify({"dataset_id": dataset_id, "events": events})
 

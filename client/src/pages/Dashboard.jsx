@@ -11,6 +11,7 @@ import {
   Pie,
   Cell,
   Legend,
+  ReferenceLine,
 } from 'recharts'
 import SummaryCards from '../components/SummaryCards'
 import CategoryChart from '../components/CategoryChart'
@@ -19,7 +20,6 @@ import {
   addTransaction,
   createManualDataset,
   deleteTransaction,
-  fetchCalendarEvents,
   fetchSummary,
   fetchTransactions,
   updateGoals,
@@ -43,33 +43,88 @@ const toDate = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
-const getWeekKey = (date) => {
-  const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = utcDate.getUTCDay() || 7
-  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1))
-  const weekNumber = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7)
-  return `${utcDate.getUTCFullYear()}-W${String(weekNumber).padStart(2, '0')}`
+const monthName = (date, mode = 'long') =>
+  date.toLocaleString('en-US', { month: mode })
+
+const weekOfMonth = (date) => Math.floor((date.getDate() - 1) / 7) + 1
+
+const getWeekStart = (date) => {
+  const day = date.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  const start = new Date(date)
+  start.setDate(date.getDate() + diff)
+  start.setHours(0, 0, 0, 0)
+  return start
 }
 
-const getPeriodKey = (date, granularity) => {
-  if (granularity === 'weekly') return getWeekKey(date)
-  if (granularity === 'yearly') return String(date.getFullYear())
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+const getWeekEnd = (date) => {
+  const end = new Date(getWeekStart(date))
+  end.setDate(end.getDate() + 6)
+  end.setHours(23, 59, 59, 999)
+  return end
 }
 
-const getPeriodLabel = (key, granularity) => {
-  if (granularity === 'weekly') return `Week ${key.split('-W')[1]} (${key.split('-W')[0]})`
-  if (granularity === 'yearly') return key
-  const [year, month] = key.split('-')
-  return `${year}-${month}`
+const getMonthStart = (date) => new Date(date.getFullYear(), date.getMonth(), 1)
+const getMonthEnd = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999)
+const getYearStart = (date) => new Date(date.getFullYear(), 0, 1)
+const getYearEnd = (date) => new Date(date.getFullYear(), 11, 31, 23, 59, 59, 999)
+
+const addDays = (date, days) => {
+  const copy = new Date(date)
+  copy.setDate(copy.getDate() + days)
+  return copy
+}
+
+const asIso = (date) => date.toISOString().slice(0, 10)
+
+function ChartTooltip({ active, payload, granularity }) {
+  if (!active || !payload || payload.length === 0) return null
+  const row = payload[0]?.payload
+  if (!row) return null
+
+  const periodTitle =
+    granularity === 'weekly'
+      ? `Day: ${row.detailLabel || row.label}`
+      : granularity === 'monthly'
+        ? `Week: ${row.detailLabel || row.label}`
+        : `Month: ${row.detailLabel || row.label}`
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-md dark:border-slate-700 dark:bg-slate-900">
+      <p className="font-semibold text-slate-900 dark:text-slate-100">{periodTitle}</p>
+      <p className="text-emerald-700 dark:text-emerald-300">Income: ${Number(row.income || 0).toFixed(2)}</p>
+      <p className="text-rose-700 dark:text-rose-300">Expenses: ${Number(row.expenses || 0).toFixed(2)}</p>
+      <p className="text-blue-700 dark:text-blue-300">Net: ${Number(row.net || 0).toFixed(2)}</p>
+      {Number(row.budget_target || 0) > 0 && (
+        <p className="text-amber-700 dark:text-amber-300">Budget target: ${Number(row.budget_target).toFixed(2)}</p>
+      )}
+    </div>
+  )
+}
+
+function CollapsibleSection({ title, isOpen, onToggle, children, className = '' }) {
+  return (
+    <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 ${className}`}>
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-lg font-semibold">{title}</h3>
+        <button
+          type="button"
+          className="rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
+          onClick={onToggle}
+        >
+          {isOpen ? 'Collapse' : 'Expand'}
+        </button>
+      </div>
+      {isOpen && children}
+    </section>
+  )
 }
 
 function Dashboard() {
   const [datasetId, setDatasetId] = useState(localStorage.getItem('datasetId'))
   const [summary, setSummary] = useState(null)
   const [transactions, setTransactions] = useState([])
-  const [calendarEvents, setCalendarEvents] = useState([])
+  const [now, setNow] = useState(new Date())
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [saving, setSaving] = useState(false)
@@ -77,22 +132,35 @@ function Dashboard() {
   const [manualRows, setManualRows] = useState([{ ...emptyManualRow }])
   const [goalForm, setGoalForm] = useState({ monthly_budget: '', savings_goal: '' })
   const [granularity, setGranularity] = useState('monthly')
-  const [selectedPeriod, setSelectedPeriod] = useState('')
+  const [selectedScope, setSelectedScope] = useState('')
   const [editingTxId, setEditingTxId] = useState('')
   const [editRow, setEditRow] = useState({ ...emptyManualRow })
+  const [showAllManualEntries, setShowAllManualEntries] = useState(false)
+  const [expanded, setExpanded] = useState({
+    manual: true,
+    analytics: true,
+    periodData: true,
+    budget: true,
+    categoryMix: true,
+    manualEntries: true,
+    history: true,
+  })
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60000)
+    return () => window.clearInterval(timer)
+  }, [])
 
   const loadData = useCallback(async (id = datasetId) => {
     if (!id) {
       setSummary(null)
       setTransactions([])
-      setCalendarEvents([])
       return
     }
     try {
       setError('')
-      const [summaryData, calendarData, transactionData] = await Promise.all([
+      const [summaryData, transactionData] = await Promise.all([
         fetchSummary(id),
-        fetchCalendarEvents(id),
         fetchTransactions(id),
       ])
       setSummary(summaryData)
@@ -101,7 +169,6 @@ function Dashboard() {
         monthly_budget: summaryData.goals?.monthly_budget || '',
         savings_goal: summaryData.goals?.savings_goal || '',
       })
-      setCalendarEvents(calendarData.events || [])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load dashboard')
     }
@@ -111,14 +178,122 @@ function Dashboard() {
     loadData()
   }, [loadData])
 
-  const periodChartData = useMemo(() => {
-    const grouped = new Map()
+  const scopeOptions = useMemo(() => {
+    const map = new Map()
+    const addScopeForDate = (parsedDate) => {
+      if (granularity === 'weekly') {
+        const start = getWeekStart(parsedDate)
+        const end = getWeekEnd(parsedDate)
+        const key = asIso(start)
+        map.set(key, {
+          key,
+          label: `${monthName(start)} week ${weekOfMonth(start)} (${start.getFullYear()})`,
+          start,
+          end,
+        })
+      } else if (granularity === 'monthly') {
+        const start = getMonthStart(parsedDate)
+        const end = getMonthEnd(parsedDate)
+        const key = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`
+        map.set(key, {
+          key,
+          label: `${monthName(start)} ${start.getFullYear()}`,
+          start,
+          end,
+        })
+      } else {
+        const start = getYearStart(parsedDate)
+        const end = getYearEnd(parsedDate)
+        const key = `${start.getFullYear()}`
+        map.set(key, {
+          key,
+          label: key,
+          start,
+          end,
+        })
+      }
+    }
+
     for (const tx of transactions) {
       const parsedDate = toDate(tx.date)
-      if (!parsedDate) continue
-      const key = getPeriodKey(parsedDate, granularity)
-      const existing = grouped.get(key) || { period: key, label: getPeriodLabel(key, granularity), income: 0, expenses: 0, net: 0 }
-      const amount = Number(tx.amount || 0)
+      if (parsedDate) addScopeForDate(parsedDate)
+
+      const isRecurringManualSub =
+        tx.source === 'manual_subscription' &&
+        Number(tx.interval_days || 0) > 0 &&
+        toDate(tx.next_charge_date || tx.date)
+
+      if (isRecurringManualSub) {
+        const intervalDays = Number(tx.interval_days)
+        let due = toDate(tx.next_charge_date || tx.date)
+        const horizon = addDays(new Date(), 370)
+        while (due && due <= horizon) {
+          addScopeForDate(due)
+          due = addDays(due, intervalDays)
+        }
+      }
+    }
+
+    return [...map.values()].sort((a, b) => a.start.getTime() - b.start.getTime())
+  }, [transactions, granularity])
+
+  useEffect(() => {
+    if (!scopeOptions.length) {
+      setSelectedScope('')
+      return
+    }
+    if (!selectedScope || !scopeOptions.some((option) => option.key === selectedScope)) {
+      setSelectedScope(scopeOptions[scopeOptions.length - 1].key)
+    }
+  }, [scopeOptions, selectedScope])
+
+  const activeScope = useMemo(
+    () => ({
+      label: `${monthName(now)} ${now.getFullYear()}`,
+      start: new Date(now.getFullYear(), now.getMonth(), 1),
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999),
+    }),
+    [now]
+  )
+
+  const scopeRangeStart = activeScope.start
+  const scopeRangeEnd = activeScope.end
+
+  const periodChartData = useMemo(() => {
+    const budgetTarget = Number(goalForm.monthly_budget || 0)
+    if (!scopeRangeStart || !scopeRangeEnd) return []
+
+    const grouped = new Map()
+    const addPoint = (date, amount) => {
+      if (date < scopeRangeStart || date > scopeRangeEnd) return
+
+      let key
+      let label
+      let detailLabel
+      if (granularity === 'weekly') {
+        key = asIso(date)
+        label = date.toLocaleString('en-US', { weekday: 'short' })
+        detailLabel = `${monthName(date)} ${date.getDate()}, ${date.getFullYear()}`
+      } else if (granularity === 'monthly') {
+        const wom = weekOfMonth(date)
+        key = `${date.getFullYear()}-${date.getMonth()}-W${wom}`
+        label = `${monthName(date)} week ${wom}`
+        detailLabel = `${monthName(date)} week ${wom}, ${date.getFullYear()}`
+      } else {
+        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+        label = monthName(date, 'short')
+        detailLabel = `${monthName(date)} ${date.getFullYear()}`
+      }
+
+      const existing = grouped.get(key) || {
+        period: key,
+        label,
+        detailLabel,
+        income: 0,
+        expenses: 0,
+        net: 0,
+        budget_target: budgetTarget > 0 ? budgetTarget : 0,
+      }
       if (amount < 0) {
         existing.income += Math.abs(amount)
       } else {
@@ -127,37 +302,72 @@ function Dashboard() {
       existing.net = existing.income - existing.expenses
       grouped.set(key, existing)
     }
-    return [...grouped.values()].sort((a, b) => a.period.localeCompare(b.period))
-  }, [transactions, granularity])
 
-  const periodKeys = useMemo(() => periodChartData.map((item) => item.period), [periodChartData])
-
-  useEffect(() => {
-    if (!periodKeys.length) {
-      setSelectedPeriod('')
-      return
-    }
-    if (!selectedPeriod || !periodKeys.includes(selectedPeriod)) {
-      setSelectedPeriod(periodKeys[periodKeys.length - 1])
-    }
-  }, [periodKeys, selectedPeriod])
-
-  const categoryDataForSelectedPeriod = useMemo(() => {
-    if (!selectedPeriod) return []
-    const totals = new Map()
     for (const tx of transactions) {
+      const amount = Number(tx.amount || 0)
+      if (!Number.isFinite(amount)) continue
+
+      const isRecurringManualSub =
+        tx.source === 'manual_subscription' &&
+        Number(tx.interval_days || 0) > 0 &&
+        toDate(tx.next_charge_date || tx.date)
+
+      if (isRecurringManualSub) {
+        const intervalDays = Number(tx.interval_days)
+        let due = toDate(tx.next_charge_date || tx.date)
+        while (due && due <= scopeRangeEnd) {
+          if (due >= scopeRangeStart) {
+            addPoint(due, Math.abs(amount))
+          }
+          due = addDays(due, intervalDays)
+        }
+        continue
+      }
+
       const parsedDate = toDate(tx.date)
       if (!parsedDate) continue
-      if (getPeriodKey(parsedDate, granularity) !== selectedPeriod) continue
+      addPoint(parsedDate, amount)
+    }
+
+    return [...grouped.values()].sort((a, b) => a.period.localeCompare(b.period))
+  }, [transactions, granularity, goalForm.monthly_budget, scopeRangeStart, scopeRangeEnd])
+
+  const categoryDataForSelectedPeriod = useMemo(() => {
+    if (!scopeRangeStart || !scopeRangeEnd) return []
+    const totals = new Map()
+
+    for (const tx of transactions) {
       const amount = Number(tx.amount || 0)
-      if (amount <= 0) continue
+      if (!Number.isFinite(amount) || amount <= 0) continue
+
+      const isRecurringManualSub =
+        tx.source === 'manual_subscription' &&
+        Number(tx.interval_days || 0) > 0 &&
+        toDate(tx.next_charge_date || tx.date)
+
+      if (isRecurringManualSub) {
+        const intervalDays = Number(tx.interval_days)
+        let due = toDate(tx.next_charge_date || tx.date)
+        while (due && due <= scopeRangeEnd) {
+          if (due >= scopeRangeStart) {
+            const category = tx.category || 'Subscription'
+            totals.set(category, (totals.get(category) || 0) + Math.abs(amount))
+          }
+          due = addDays(due, intervalDays)
+        }
+        continue
+      }
+
+      const parsedDate = toDate(tx.date)
+      if (!parsedDate || parsedDate < scopeRangeStart || parsedDate > scopeRangeEnd) continue
       const category = tx.category || 'Other'
       totals.set(category, (totals.get(category) || 0) + amount)
     }
+
     return [...totals.entries()]
       .map(([category, amount]) => ({ category, amount: Number(amount.toFixed(2)) }))
       .sort((a, b) => b.amount - a.amount)
-  }, [transactions, granularity, selectedPeriod])
+  }, [transactions, scopeRangeStart, scopeRangeEnd])
 
   const budgetUsage = useMemo(() => {
     const budget = Number(goalForm.monthly_budget || 0)
@@ -165,6 +375,41 @@ function Dashboard() {
     if (!budget) return null
     return Math.min(100, Math.round((spent / budget) * 100))
   }, [goalForm.monthly_budget, summary?.total_spent_this_month])
+
+  const savingsGoalForecast = useMemo(() => {
+    const savingsGoal = Number(goalForm.savings_goal || 0)
+    const budget = Number(goalForm.monthly_budget || 0)
+    if (!savingsGoal || !budget || !summary) return null
+
+    const monthlyCashflow = Array.isArray(summary.monthly_cashflow) ? summary.monthly_cashflow : []
+    const monthsWithIncome = monthlyCashflow
+      .map((entry) => Number(entry?.income || 0))
+      .filter((income) => income > 0)
+    const averageMonthlyIncome = monthsWithIncome.length
+      ? monthsWithIncome.reduce((sum, income) => sum + income, 0) / monthsWithIncome.length
+      : Number(summary.total_income_this_month || 0)
+
+    if (!averageMonthlyIncome || averageMonthlyIncome <= 0) {
+      return { status: 'unavailable' }
+    }
+
+    const projectedMonthlySavings = averageMonthlyIncome - budget
+    if (projectedMonthlySavings <= 0) {
+      return { status: 'not_reachable', projectedMonthlySavings }
+    }
+
+    const months = Math.ceil(savingsGoal / projectedMonthlySavings)
+    const years = Math.floor(months / 12)
+    const remainingMonths = months % 12
+
+    return {
+      status: 'ok',
+      months,
+      years,
+      remainingMonths,
+      projectedMonthlySavings,
+    }
+  }, [goalForm.monthly_budget, goalForm.savings_goal, summary])
 
   const persistTransactions = async (newTransactions) => {
     if (!newTransactions.length) return null
@@ -323,13 +568,21 @@ function Dashboard() {
         .sort((a, b) => String(b.date).localeCompare(String(a.date))),
     [transactions]
   )
+  const visibleTransactions = showAllManualEntries ? sortedTransactions : sortedTransactions.slice(0, 8)
+  const historyRows = useMemo(() => {
+    if (!summary?.monthly_cashflow) return []
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    return summary.monthly_cashflow
+      .filter((row) => row.month < currentKey)
+      .sort((a, b) => String(b.month).localeCompare(String(a.month)))
+  }, [summary, now])
 
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-2xl font-semibold tracking-tight">Dashboard</h2>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          Use manual entry as the primary workflow. Switch analytics by weekly, monthly, or yearly views.
+          {now.toLocaleString()} • Data shown for current month ({activeScope.label}).
         </p>
       </div>
 
@@ -337,9 +590,13 @@ function Dashboard() {
       {successMessage && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p>}
 
       <section className="grid gap-4 lg:grid-cols-3">
-        <article className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:col-span-2">
+        <CollapsibleSection
+          title="Manual entry (primary)"
+          isOpen={expanded.manual}
+          onToggle={() => setExpanded((prev) => ({ ...prev, manual: !prev.manual }))}
+          className="lg:col-span-2"
+        >
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Manual entry (primary)</h3>
             <button
               type="button"
               className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700"
@@ -413,7 +670,7 @@ function Dashboard() {
           <button type="button" className="rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-70" onClick={saveManualEntries} disabled={saving}>
             {saving ? 'Saving...' : 'Save manual entries'}
           </button>
-        </article>
+        </CollapsibleSection>
 
         <div>
           <UploadCard onUpload={handleUpload} loading={csvLoading} successMessage="" error="" />
@@ -422,31 +679,24 @@ function Dashboard() {
 
       {summary && <SummaryCards summary={summary} />}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <CollapsibleSection
+        title="Analytics view"
+        isOpen={expanded.analytics}
+        onToggle={() => setExpanded((prev) => ({ ...prev, analytics: !prev.analytics }))}
+      >
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <h3 className="text-lg font-semibold">Analytics view</h3>
           <select
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             value={granularity}
             onChange={(e) => setGranularity(e.target.value)}
           >
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
+            <option value="weekly">Weekly (by day)</option>
+            <option value="monthly">Monthly (by week)</option>
+            <option value="yearly">Yearly (by month)</option>
           </select>
-          <select
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            disabled={!periodKeys.length}
-          >
-            {periodKeys.length === 0 && <option value="">No period data</option>}
-            {periodKeys.map((key) => (
-              <option key={key} value={key}>
-                {getPeriodLabel(key, granularity)}
-              </option>
-            ))}
-          </select>
+          <span className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200">
+            {activeScope.label}
+          </span>
         </div>
 
         <div className="h-72">
@@ -455,21 +705,32 @@ function Dashboard() {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="label" />
               <YAxis />
-              <Tooltip />
+              <Tooltip content={<ChartTooltip granularity={granularity} />} />
               <Legend />
+              {Number(goalForm.monthly_budget || 0) > 0 && (
+                <ReferenceLine
+                  y={Number(goalForm.monthly_budget)}
+                  stroke="#f59e0b"
+                  strokeDasharray="4 4"
+                  ifOverflow="extendDomain"
+                  label={{ value: 'Budget target', position: 'right', fill: '#b45309' }}
+                />
+              )}
               <Line type="monotone" dataKey="income" stroke="#16a34a" strokeWidth={3} />
               <Line type="monotone" dataKey="expenses" stroke="#dc2626" strokeWidth={3} />
               <Line type="monotone" dataKey="net" stroke="#2563eb" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </div>
-      </section>
+      </CollapsibleSection>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <CategoryChart data={categoryDataForSelectedPeriod} />
-
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="mb-3 text-lg font-semibold">Period data ({granularity})</h3>
+        <CollapsibleSection
+          title={`Period data (${granularity})`}
+          isOpen={expanded.periodData}
+          onToggle={() => setExpanded((prev) => ({ ...prev, periodData: !prev.periodData }))}
+          className="rounded-xl"
+        >
           <div className="max-h-72 overflow-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="bg-slate-50 dark:bg-slate-800">
@@ -497,22 +758,14 @@ function Dashboard() {
               </tbody>
             </table>
           </div>
-        </article>
-      </section>
+        </CollapsibleSection>
 
-      <section className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="mb-3 text-lg font-semibold">Budget goals</h3>
-          <div className="mb-3 grid gap-2 md:grid-cols-2">
-            <input className="rounded border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" type="number" placeholder="Monthly budget" value={goalForm.monthly_budget} onChange={(e) => setGoalForm((p) => ({ ...p, monthly_budget: e.target.value }))} />
-            <input className="rounded border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" type="number" placeholder="Savings goal" value={goalForm.savings_goal} onChange={(e) => setGoalForm((p) => ({ ...p, savings_goal: e.target.value }))} />
-          </div>
-          <button className="rounded bg-indigo-600 px-3 py-2 text-white" onClick={saveGoals}>Save goals</button>
-          {budgetUsage !== null && <p className="mt-2 text-sm">Budget usage this month: {budgetUsage}%</p>}
-        </article>
-
-        <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <h3 className="mb-3 text-lg font-semibold">Category mix ({selectedPeriod || 'latest'})</h3>
+        <CollapsibleSection
+          title={`Category mix (${activeScope?.label || 'selected period'})`}
+          isOpen={expanded.categoryMix}
+          onToggle={() => setExpanded((prev) => ({ ...prev, categoryMix: !prev.categoryMix }))}
+          className="rounded-xl"
+        >
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -525,11 +778,84 @@ function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
           </div>
-        </article>
+        </CollapsibleSection>
       </section>
 
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="mb-2 text-lg font-semibold">Previous manual entries</h3>
+      <section className="grid gap-4 md:grid-cols-1">
+        <CollapsibleSection
+          title="Budget goals"
+          isOpen={expanded.budget}
+          onToggle={() => setExpanded((prev) => ({ ...prev, budget: !prev.budget }))}
+          className="rounded-xl"
+        >
+          <div className="mb-3 grid gap-2 md:grid-cols-2">
+            <input className="rounded border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" type="number" placeholder="Monthly budget" value={goalForm.monthly_budget} onChange={(e) => setGoalForm((p) => ({ ...p, monthly_budget: e.target.value }))} />
+            <input className="rounded border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" type="number" placeholder="Savings goal" value={goalForm.savings_goal} onChange={(e) => setGoalForm((p) => ({ ...p, savings_goal: e.target.value }))} />
+          </div>
+          <button className="rounded bg-indigo-600 px-3 py-2 text-white" onClick={saveGoals}>Save goals</button>
+          {budgetUsage !== null && <p className="mt-2 text-sm">Budget usage this month: {budgetUsage}%</p>}
+          {savingsGoalForecast?.status === 'ok' && (
+            <p className="mt-2 text-sm">
+              Estimated time to reach savings goal: {savingsGoalForecast.years > 0 ? `${savingsGoalForecast.years}y ` : ''}
+              {savingsGoalForecast.remainingMonths}m
+              {' '}at ~${savingsGoalForecast.projectedMonthlySavings.toFixed(2)}/month if budget is maintained.
+            </p>
+          )}
+          {savingsGoalForecast?.status === 'not_reachable' && (
+            <p className="mt-2 text-sm text-amber-700">
+              At the current budget, projected monthly savings are ${savingsGoalForecast.projectedMonthlySavings.toFixed(2)}.
+              Increase income or lower budgeted spend to reach the savings goal.
+            </p>
+          )}
+          {savingsGoalForecast?.status === 'unavailable' && (
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              Add income entries to estimate when your savings goal will be reached.
+            </p>
+          )}
+        </CollapsibleSection>
+      </section>
+
+      <CollapsibleSection
+        title="History"
+        isOpen={expanded.history}
+        onToggle={() => setExpanded((prev) => ({ ...prev, history: !prev.history }))}
+        className="rounded-xl"
+      >
+        <div className="max-h-72 overflow-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-800">
+              <tr>
+                <th className="px-3 py-2">Month</th>
+                <th className="px-3 py-2">Income</th>
+                <th className="px-3 py-2">Expenses</th>
+                <th className="px-3 py-2">Net</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historyRows.map((row) => (
+                <tr key={row.month} className="border-t border-slate-200 dark:border-slate-700">
+                  <td className="px-3 py-2">{row.month}</td>
+                  <td className="px-3 py-2">${Number(row.income || 0).toFixed(2)}</td>
+                  <td className="px-3 py-2">${Number(row.expenses || 0).toFixed(2)}</td>
+                  <td className="px-3 py-2">${Number(row.net || 0).toFixed(2)}</td>
+                </tr>
+              ))}
+              {historyRows.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-3 py-4 text-slate-500">No prior month history yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Previous manual entries"
+        isOpen={expanded.manualEntries}
+        onToggle={() => setExpanded((prev) => ({ ...prev, manualEntries: !prev.manualEntries }))}
+        className="rounded-xl"
+      >
         <div className="max-h-[420px] overflow-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-slate-50 dark:bg-slate-800">
@@ -543,7 +869,7 @@ function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {sortedTransactions.map((tx) => {
+              {visibleTransactions.map((tx) => {
                 const isEditing = editingTxId === tx.tx_id
                 return (
                   <tr key={tx.tx_id || `${tx.date}-${tx.merchant}-${tx.amount}`} className="border-t border-slate-200 dark:border-slate-700">
@@ -601,22 +927,18 @@ function Dashboard() {
             </tbody>
           </table>
         </div>
-      </article>
-
-      <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h3 className="mb-2 text-lg font-semibold">Google Calendar upcoming payments</h3>
-        <ul className="space-y-1 text-sm">
-          {calendarEvents.length === 0 && <li className="text-slate-500">No recurring events yet.</li>}
-          {calendarEvents.map((event) => (
-            <li key={`${event.title}-${event.date}`}>
-              {event.date} • {event.title} •{' '}
-              <a href={event.google_calendar_url} target="_blank" rel="noreferrer" className="text-indigo-600 underline">
-                Add to Google Calendar
-              </a>
-            </li>
-          ))}
-        </ul>
-      </article>
+        {sortedTransactions.length > 8 && (
+          <div className="mt-3">
+            <button
+              type="button"
+              className="rounded-lg border border-slate-300 px-3 py-1 text-sm text-slate-700 dark:border-slate-700 dark:text-slate-200"
+              onClick={() => setShowAllManualEntries((prev) => !prev)}
+            >
+              {showAllManualEntries ? 'Show less' : 'See all'}
+            </button>
+          </div>
+        )}
+      </CollapsibleSection>
     </div>
   )
 }

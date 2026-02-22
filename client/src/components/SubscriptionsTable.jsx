@@ -4,6 +4,8 @@ const intervalLabel = (days) => {
   if (days === 7) return 'Weekly'
   if (days === 14) return 'Bi-weekly'
   if (days === 30) return 'Monthly'
+  if (days === 90) return 'Quarterly'
+  if (days === 365) return 'Yearly'
   return `${days} days`
 }
 
