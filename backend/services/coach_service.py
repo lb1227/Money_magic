@@ -6,6 +6,7 @@ If the key or API call is unavailable, it falls back to the internal summary.
 """
 
 from __future__ import annotations
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -14,6 +15,8 @@ try:
     from google import genai
 except Exception:
     genai = None
+
+logger = logging.getLogger(__name__)
 
 
 def load_gemini_key() -> Optional[str]:
@@ -29,6 +32,13 @@ def load_gemini_key() -> Optional[str]:
         return k or None
 
     return None
+
+
+def get_gemini_runtime_status() -> dict:
+    """Return safe runtime indicators for logging and diagnostics."""
+    key_present = bool(load_gemini_key())
+    sdk_loaded = genai is not None
+    return {"key_present": key_present, "sdk_loaded": sdk_loaded}
 
 
 def _make_genai_client(api_key: str):
@@ -78,6 +88,13 @@ def build_coach_response(question: str, summary: dict, subscriptions: list[dict]
     # Use provided key if present, else load
     gemini_key = gemini_api_key or load_gemini_key()
     gemini_text = _call_gemini(question, gemini_key) if gemini_key else None
+
+    logger.info(
+        "Coach Gemini status: key_present=%s sdk_loaded=%s using_fallback=%s",
+        bool(gemini_key),
+        genai is not None,
+        gemini_text is None,
+    )
 
     category_totals = summary.get("category_totals", [])
     top_categories = category_totals[:3]

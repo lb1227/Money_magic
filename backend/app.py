@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from datetime import date, datetime, timedelta
@@ -11,11 +12,14 @@ from flask_cors import CORS
 
 
 from services.categorize_service import categorize_transactions
-from services.coach_service import build_coach_response
+from services.coach_service import build_coach_response, get_gemini_runtime_status
 from services.csv_service import CSVParseError, parse_and_normalize_csv
 from services.recurring_service import detect_subscriptions
 from services.summary_service import build_summary
 from store import get_dataset, save_dataset
+
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -29,6 +33,12 @@ if "*" in origins:
 
 CORS(app, resources={r"/api/*": {"origins": origins}})
 
+status = get_gemini_runtime_status()
+logger.info(
+    "Coach Gemini startup status: key_present=%s sdk_loaded=%s",
+    status["key_present"],
+    status["sdk_loaded"],
+)
 
 
 @app.errorhandler(404)
