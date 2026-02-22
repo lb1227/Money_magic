@@ -610,7 +610,7 @@ function Dashboard() {
       {error && <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
       {successMessage && <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{successMessage}</p>}
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid items-start gap-4 lg:grid-cols-3">
         <CollapsibleSection
           title="Manual entry (primary)"
           isOpen={expanded.manual}
@@ -779,7 +779,7 @@ function Dashboard() {
         </div>
       </CollapsibleSection>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid items-start gap-4 md:grid-cols-2">
         <CollapsibleSection
           title={`Period data (${granularity})`}
           isOpen={expanded.periodData}
