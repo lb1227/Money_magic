@@ -65,6 +65,21 @@ const getPeriodLabel = (key, granularity) => {
   return `${year}-${month}`
 }
 
+const chartTooltipProps = {
+  contentStyle: {
+    backgroundColor: '#0f172a',
+    borderColor: '#334155',
+    borderRadius: '0.75rem',
+    boxShadow: '0 10px 30px rgba(15, 23, 42, 0.35)',
+  },
+  labelStyle: { color: '#e2e8f0', fontWeight: 600 },
+  itemStyle: { color: '#cbd5e1' },
+  cursor: { fill: 'rgba(79, 70, 229, 0.12)' },
+}
+
+const manualFieldClass =
+  'h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-900/50'
+
 function Dashboard() {
   const [datasetId, setDatasetId] = useState(localStorage.getItem('datasetId'))
   const [summary, setSummary] = useState(null)
@@ -80,6 +95,8 @@ function Dashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState('')
   const [editingTxId, setEditingTxId] = useState('')
   const [editRow, setEditRow] = useState({ ...emptyManualRow })
+  const [goalsSaving, setGoalsSaving] = useState(false)
+  const [goalsStatus, setGoalsStatus] = useState('')
 
   const loadData = useCallback(async (id = datasetId) => {
     if (!id) {
@@ -102,6 +119,7 @@ function Dashboard() {
         savings_goal: summaryData.goals?.savings_goal || '',
       })
       setCalendarEvents(calendarData.events || [])
+      setGoalsStatus('')
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load dashboard')
     }
@@ -132,15 +150,37 @@ function Dashboard() {
 
   const periodKeys = useMemo(() => periodChartData.map((item) => item.period), [periodChartData])
 
+  const selectablePeriods = useMemo(() => {
+    if (granularity !== 'yearly') return periodKeys
+    const currentYear = new Date().getFullYear()
+    const dataYears = transactions
+      .map((tx) => toDate(tx.date)?.getFullYear())
+      .filter((year) => Number.isInteger(year))
+    const minDataYear = dataYears.length ? Math.min(...dataYears) : currentYear
+    const startYear = Math.min(2024, minDataYear)
+    const years = []
+    for (let year = startYear; year <= currentYear + 1; year += 1) {
+      years.push(String(year))
+    }
+    return years
+  }, [granularity, periodKeys, transactions])
+
+  const displayChartData = useMemo(() => {
+    if (granularity === 'yearly' && selectedPeriod && !periodKeys.includes(selectedPeriod)) {
+      return [{ period: selectedPeriod, label: selectedPeriod, income: 0, expenses: 0, net: 0 }]
+    }
+    return periodChartData
+  }, [granularity, periodChartData, periodKeys, selectedPeriod])
+
   useEffect(() => {
-    if (!periodKeys.length) {
+    if (!selectablePeriods.length) {
       setSelectedPeriod('')
       return
     }
-    if (!selectedPeriod || !periodKeys.includes(selectedPeriod)) {
-      setSelectedPeriod(periodKeys[periodKeys.length - 1])
+    if (!selectedPeriod || !selectablePeriods.includes(selectedPeriod)) {
+      setSelectedPeriod(selectablePeriods[selectablePeriods.length - 1])
     }
-  }, [periodKeys, selectedPeriod])
+  }, [selectablePeriods, selectedPeriod])
 
   const categoryDataForSelectedPeriod = useMemo(() => {
     if (!selectedPeriod) return []
@@ -251,18 +291,25 @@ function Dashboard() {
   const saveGoals = async () => {
     if (!datasetId) {
       setError('Add manual data first, then save goals to your dashboard dataset.')
+      setGoalsStatus('Save manual entries first to create a dataset.')
       return
     }
     try {
+      setGoalsSaving(true)
       setError('')
+      setGoalsStatus('')
       await updateGoals(datasetId, {
         monthly_budget: Number(goalForm.monthly_budget || 0),
         savings_goal: Number(goalForm.savings_goal || 0),
       })
       setSuccessMessage('Goals saved.')
+      setGoalsStatus('Budget goals saved successfully.')
       await loadData(datasetId)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save goals')
+      setGoalsStatus('Unable to save goals right now.')
+    } finally {
+      setGoalsSaving(false)
     }
   }
 
@@ -350,9 +397,9 @@ function Dashboard() {
           </div>
 
           {manualRows.map((row, index) => (
-            <div key={`${row.date}-${index}`} className="grid gap-2 md:grid-cols-6">
+            <div key={`${row.date}-${index}`} className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/40 md:grid-cols-2 lg:grid-cols-3">
               <select
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className={manualFieldClass}
                 value={row.flow}
                 onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, flow: e.target.value } : entry)))}
               >
@@ -360,7 +407,7 @@ function Dashboard() {
                 <option value="income">Income</option>
               </select>
               <select
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className={manualFieldClass}
                 value={row.category}
                 onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, category: e.target.value } : entry)))}
               >
@@ -372,19 +419,19 @@ function Dashboard() {
               </select>
               <input
                 type="date"
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className={manualFieldClass}
                 value={row.date}
                 onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, date: e.target.value } : entry)))}
               />
               <input
                 placeholder="Merchant"
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className={manualFieldClass}
                 value={row.merchant}
                 onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, merchant: e.target.value } : entry)))}
               />
               <input
                 placeholder="Description"
-                className="rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className={manualFieldClass}
                 value={row.description}
                 onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, description: e.target.value } : entry)))}
               />
@@ -393,26 +440,30 @@ function Dashboard() {
                   placeholder="Amount"
                   type="number"
                   min="0"
-                  className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  className={manualFieldClass}
                   value={row.amount}
                   onChange={(e) => setManualRows((prev) => prev.map((entry, idx) => (idx === index ? { ...entry, amount: e.target.value } : entry)))}
                 />
                 {manualRows.length > 1 && (
                   <button
                     type="button"
-                    className="rounded-lg border border-slate-300 px-3 text-slate-600 dark:border-slate-700 dark:text-slate-300"
+                    className="rounded-lg border border-rose-300 px-3 text-sm text-rose-700 transition hover:bg-rose-50 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-900/20"
                     onClick={() => setManualRows((prev) => prev.filter((_, idx) => idx !== index))}
                   >
-                    Remove
+                    Remove row
                   </button>
                 )}
               </div>
             </div>
           ))}
 
-          <button type="button" className="rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-70" onClick={saveManualEntries} disabled={saving}>
-            {saving ? 'Saving...' : 'Save manual entries'}
-          </button>
+          <div className="sticky bottom-0 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white/95 p-3 dark:border-slate-700 dark:bg-slate-900/95">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Date, merchant, category, and amount are required.</p>
+            <button type="button" className="rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-700" onClick={() => setManualRows((prev) => [...prev, { ...emptyManualRow }])}>Add row</button>
+            <button type="button" className="rounded-lg bg-indigo-600 px-4 py-2 text-white disabled:opacity-70" onClick={saveManualEntries} disabled={saving}>
+              {saving ? 'Saving...' : 'Save manual entries'}
+            </button>
+          </div>
         </article>
 
         <div>
@@ -438,10 +489,10 @@ function Dashboard() {
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
-            disabled={!periodKeys.length}
+            disabled={!selectablePeriods.length}
           >
-            {periodKeys.length === 0 && <option value="">No period data</option>}
-            {periodKeys.map((key) => (
+            {selectablePeriods.length === 0 && <option value="">No period data</option>}
+            {selectablePeriods.map((key) => (
               <option key={key} value={key}>
                 {getPeriodLabel(key, granularity)}
               </option>
@@ -451,11 +502,11 @@ function Dashboard() {
 
         <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={periodChartData}>
+            <LineChart data={displayChartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="label" />
               <YAxis />
-              <Tooltip />
+              <Tooltip {...chartTooltipProps} />
               <Legend />
               <Line type="monotone" dataKey="income" stroke="#16a34a" strokeWidth={3} />
               <Line type="monotone" dataKey="expenses" stroke="#dc2626" strokeWidth={3} />
@@ -481,7 +532,7 @@ function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {periodChartData.map((row) => (
+                {displayChartData.map((row) => (
                   <tr key={row.period} className="border-t border-slate-200 dark:border-slate-700">
                     <td className="px-3 py-2">{row.label}</td>
                     <td className="px-3 py-2">${row.income.toFixed(2)}</td>
@@ -489,7 +540,7 @@ function Dashboard() {
                     <td className="px-3 py-2">${row.net.toFixed(2)}</td>
                   </tr>
                 ))}
-                {periodChartData.length === 0 && (
+                {displayChartData.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-3 py-4 text-slate-500">No data yet.</td>
                   </tr>
@@ -507,8 +558,17 @@ function Dashboard() {
             <input className="rounded border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" type="number" placeholder="Monthly budget" value={goalForm.monthly_budget} onChange={(e) => setGoalForm((p) => ({ ...p, monthly_budget: e.target.value }))} />
             <input className="rounded border border-slate-300 bg-white p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" type="number" placeholder="Savings goal" value={goalForm.savings_goal} onChange={(e) => setGoalForm((p) => ({ ...p, savings_goal: e.target.value }))} />
           </div>
-          <button className="rounded bg-indigo-600 px-3 py-2 text-white" onClick={saveGoals}>Save goals</button>
-          {budgetUsage !== null && <p className="mt-2 text-sm">Budget usage this month: {budgetUsage}%</p>}
+          <button className="rounded bg-indigo-600 px-3 py-2 text-white disabled:opacity-70" onClick={saveGoals} disabled={goalsSaving || !datasetId}>{goalsSaving ? 'Saving...' : 'Save goals'}</button>
+          {!datasetId && <p className="mt-2 text-xs text-slate-500">Save manual entries first to enable budget goals.</p>}
+          {goalsStatus && <p className="mt-2 text-sm text-indigo-700 dark:text-indigo-300">{goalsStatus}</p>}
+          {budgetUsage !== null && (
+            <div className="mt-3">
+              <p className="text-sm">Budget usage this month: {budgetUsage}%</p>
+              <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                <div className="h-full rounded-full bg-indigo-600" style={{ width: `${budgetUsage}%` }} />
+              </div>
+            </div>
+          )}
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -521,7 +581,7 @@ function Dashboard() {
                     <Cell key={entry.category} fill={colors[index % colors.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip {...chartTooltipProps} />
               </PieChart>
             </ResponsiveContainer>
           </div>

@@ -52,7 +52,7 @@ function Upload() {
         savings_goal: Number(goals.savings_goal || 0),
       })
       localStorage.setItem('datasetId', result.dataset_id)
-      setSuccessMessage('Manual dataset created ✨')
+      setSuccessMessage('Manual dataset created')
       setTimeout(() => navigate('/dashboard'), 600)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create manual dataset')
