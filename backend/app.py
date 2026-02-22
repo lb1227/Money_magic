@@ -30,6 +30,7 @@ if "*" in origins:
 CORS(app, resources={r"/api/*": {"origins": origins}})
 
 
+
 @app.errorhandler(404)
 def not_found(_: Exception):
     return jsonify({"error": "Not found"}), 404
