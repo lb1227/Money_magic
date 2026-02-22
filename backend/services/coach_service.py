@@ -186,7 +186,10 @@ def build_coach_response(question: str, summary: dict, subscriptions: list[dict]
         f"estimated monthly subscription spend is ${summary.get('subscription_monthly_total', 0):,.2f}."
     )
 
+    using_gemini = bool(gemini_text)
+
     return {
         "summary_text": gemini_text or summary_text,
-        "recommendations": recommendations,
+        "recommendations": [] if using_gemini else recommendations,
+        "response_source": "gemini" if using_gemini else "rules",
     }
