@@ -65,6 +65,14 @@ const normalizeSubscriptions = (value) => {
   )
 }
 
+const subscriptionSignature = (item = {}) => {
+  const merchant = String(item.merchant || '').trim().toLowerCase()
+  const interval = Number(item.interval_days || 30)
+  const monthlyCost = Number(item.monthly_cost || 0).toFixed(2)
+  const nextCharge = String(item.next_charge_date || item.date || '').slice(0, 10)
+  return [merchant, interval, monthlyCost, nextCharge].join('|')
+}
+
 function Subscriptions() {
   const [subscriptions, setSubscriptions] = useState([])
   const [flagged, setFlagged] = useState({})
@@ -115,7 +123,10 @@ function Subscriptions() {
       source: tx.source,
     }))
 
-    setSubscriptions([...detected, ...manualAsSubscriptions])
+    const manualSignatures = new Set(manualAsSubscriptions.map(subscriptionSignature))
+    const nonManualDetected = detected.filter((sub) => !manualSignatures.has(subscriptionSignature(sub)))
+
+    setSubscriptions([...nonManualDetected, ...manualAsSubscriptions])
     setCalendarEvents(calendarData?.events || [])
   }, [])
 
